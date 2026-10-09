@@ -1,28 +1,31 @@
 import type { Metadata } from "next";
-import { useId } from "react";
+import { Suspense } from "react";
 
 import { AuthCard } from "@/components/auth/auth-card";
-import { PasswordInput } from "@/components/auth/password-input";
-import { PlaceholderForm } from "@/components/auth/placeholder-form";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { AuthCardSkeleton } from "@/components/auth/auth-card-skeleton";
+import { ResetPasswordForm } from "@/components/auth/password-forms";
+import { TokenProblem } from "@/components/auth/token-problem";
+import { getResetTokenState } from "@/server/auth/queries";
 
-export const metadata: Metadata = { title: "Şifre sıfırla" };
+export const metadata: Metadata = { title: "Şifre sıfırla", robots: { index: false } };
 
-// Token validation and the reset action are wired in F1.
-export default function ResetPasswordPage() {
-  const passwordId = useId();
+async function ResetContent({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params;
+  const tokenState = await getResetTokenState(token);
+  if (tokenState.status !== "valid") {
+    return <TokenProblem status={tokenState.status} retryHref="/sifremi-unuttum" />;
+  }
   return (
     <AuthCard title="Yeni şifre belirleyin" description="Sıfırlama linki tek kullanımlıktır.">
-      <PlaceholderForm className="space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor={passwordId}>Yeni şifre</Label>
-          <PasswordInput id={passwordId} name="password" autoComplete="new-password" />
-        </div>
-        <Button type="submit" size="lg" className="h-11 w-full text-sm">
-          Şifreyi kaydet
-        </Button>
-      </PlaceholderForm>
+      <ResetPasswordForm token={token} email={tokenState.email} />
     </AuthCard>
+  );
+}
+
+export default function ResetPasswordPage({ params }: { params: Promise<{ token: string }> }) {
+  return (
+    <Suspense fallback={<AuthCardSkeleton />}>
+      <ResetContent params={params} />
+    </Suspense>
   );
 }

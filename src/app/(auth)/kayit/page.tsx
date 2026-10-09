@@ -1,33 +1,32 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { Suspense } from "react";
 
-import { AudienceEmailField } from "@/components/auth/audience-email-field";
 import { AuthCard } from "@/components/auth/auth-card";
-import { PlaceholderForm } from "@/components/auth/placeholder-form";
-import { Button } from "@/components/ui/button";
+import { AuthCardSkeleton } from "@/components/auth/auth-card-skeleton";
+import { RegisterForm } from "@/components/auth/register-form";
+import { getAuthPageConfig } from "@/server/auth/queries";
 
 export const metadata: Metadata = { title: "Kayıt ol" };
 
-export default function RegisterPage() {
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+async function RegisterContent({ searchParams }: { searchParams: SearchParams }) {
+  const [params, config] = await Promise.all([searchParams, getAuthPageConfig()]);
+  const oauth = Array.isArray(params.oauth) ? params.oauth[0] : params.oauth;
   return (
     <AuthCard
       title="Kayıt ol"
       description="Öğrenci numaranızı girin. Okul mailinize bir doğrulama linki göndereceğiz."
     >
-      <div className="space-y-4">
-        <PlaceholderForm className="space-y-4">
-          <AudienceEmailField lockAudience="student" />
-          <Button type="submit" size="lg" className="h-11 w-full text-sm">
-            Doğrulama linki gönder
-          </Button>
-        </PlaceholderForm>
-        <Link
-          href="/giris"
-          className="inline-flex min-h-11 items-center text-sm text-primary underline-offset-4 hover:underline"
-        >
-          Zaten hesabım var
-        </Link>
-      </div>
+      <RegisterForm turnstileSiteKey={config.turnstileSiteKey} oauthUnlinked={oauth === "unlinked"} />
     </AuthCard>
+  );
+}
+
+export default function RegisterPage({ searchParams }: { searchParams: SearchParams }) {
+  return (
+    <Suspense fallback={<AuthCardSkeleton />}>
+      <RegisterContent searchParams={searchParams} />
+    </Suspense>
   );
 }

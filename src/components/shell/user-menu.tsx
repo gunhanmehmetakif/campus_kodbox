@@ -2,6 +2,7 @@
 
 import { LogOut, UserCog } from "lucide-react";
 import Link from "next/link";
+import { useActionState } from "react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -12,6 +13,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
+import { logoutAction } from "@/server/auth/actions";
 
 import { ROLE_LABELS, type Role } from "./nav-items";
 
@@ -28,6 +31,7 @@ function initials(label: string): string {
 }
 
 export function UserMenu({ role, label }: UserMenuProps) {
+  const [, logout] = useActionState(logoutAction, null);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -52,11 +56,14 @@ export function UserMenu({ role, label }: UserMenuProps) {
             Hesap ayarları
           </Link>
         </DropdownMenuItem>
-        {/* Sign-out action is added with the auth flows in F1. */}
-        <DropdownMenuItem disabled className="min-h-11">
-          <LogOut aria-hidden="true" />
-          Çıkış yap
-        </DropdownMenuItem>
+        <form action={logout}>
+          <DropdownMenuItem asChild className="min-h-11" onSelect={(e) => e.preventDefault()}>
+            <button type="submit" className="w-full">
+              <LogOut aria-hidden="true" />
+              Çıkış yap
+            </button>
+          </DropdownMenuItem>
+        </form>
       </DropdownMenuContent>
     </DropdownMenu>
   );

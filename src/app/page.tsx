@@ -3,18 +3,13 @@ import { Suspense } from "react";
 
 import { LogoMark } from "@/components/brand/logo";
 import { getCurrentUser } from "@/lib/auth";
-
-const ROLE_HOME = {
-  admin: "/admin",
-  instructor: "/egitmen",
-  student: "/ogrenci",
-} as const;
+import { homePathForRole, routes } from "@/lib/routes";
 
 async function Redirector(): Promise<never> {
   const user = await getCurrentUser();
-  if (!user) redirect("/giris");
-  if (user.mustChangePassword) redirect("/sifre-degistir");
-  redirect(ROLE_HOME[user.role]);
+  if (!user) redirect(routes.login);
+  if (user.mustChangePassword) redirect(routes.changePassword);
+  redirect(homePathForRole(user.role));
 }
 
 export default function RootPage() {

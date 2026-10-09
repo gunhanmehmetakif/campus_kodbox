@@ -17,6 +17,7 @@ type SchoolEmailInputProps = {
   name?: string;
   disabled?: boolean;
   invalid?: boolean;
+  describedBy?: string;
   className?: string;
 };
 
@@ -35,9 +36,10 @@ export function SchoolEmailInput({
   audience,
   onAudienceSuggest,
   id,
-  name = "identifier",
+  name = "local",
   disabled,
   invalid,
+  describedBy,
   className,
 }: SchoolEmailInputProps) {
   const autoId = useId();
@@ -82,6 +84,7 @@ export function SchoolEmailInput({
         spellCheck={false}
         disabled={disabled}
         aria-invalid={invalid || undefined}
+        aria-describedby={describedBy}
         className="h-full min-w-0 flex-1 bg-transparent px-3 text-base outline-none placeholder:text-muted-foreground md:text-sm"
       />
       <span

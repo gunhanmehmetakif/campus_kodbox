@@ -11,12 +11,21 @@ function GoogleMark() {
   );
 }
 
-/** Visual only in F0 (no handler); Google sign-in is added in F1. */
-export function GoogleButton({ label = "Google ile giriş" }: { label?: string }) {
+type GoogleButtonProps = {
+  /** Google OAuth route handler (full page navigation, not a client route). */
+  href: string;
+  label?: string;
+  variant?: "outline" | "default";
+  className?: string;
+};
+
+export function GoogleButton({ href, label = "Google ile giriş", variant = "outline", className }: GoogleButtonProps) {
   return (
-    <Button type="button" variant="outline" className="h-11 w-full text-sm">
-      <GoogleMark />
-      {label}
+    <Button asChild variant={variant} className={className ?? "h-11 w-full text-sm"}>
+      <a href={href}>
+        <GoogleMark />
+        {label}
+      </a>
     </Button>
   );
 }

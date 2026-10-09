@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { isProtectedPath, loginUrl } from "@/lib/routes";
+import { isProtectedPath, loginUrl, routes } from "@/lib/routes";
 import {
   PATHNAME_HEADER,
   REMEMBER_COOKIE_NAME,
@@ -26,6 +26,11 @@ export function proxy(request: NextRequest) {
 
   if (!token && isProtectedPath(pathname)) {
     return NextResponse.redirect(new URL(loginUrl(pathname + search), request.url));
+  }
+
+  // Optimistic: no session cookie on "/" means the login page. With a cookie the page decides.
+  if (!token && pathname === "/") {
+    return NextResponse.redirect(new URL(routes.login, request.url));
   }
 
   const requestHeaders = new Headers(request.headers);

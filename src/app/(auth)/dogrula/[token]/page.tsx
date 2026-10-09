@@ -1,36 +1,31 @@
 import type { Metadata } from "next";
-import { useId } from "react";
+import { Suspense } from "react";
 
 import { AuthCard } from "@/components/auth/auth-card";
-import { PasswordInput } from "@/components/auth/password-input";
-import { PlaceholderForm } from "@/components/auth/placeholder-form";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
+import { AuthCardSkeleton } from "@/components/auth/auth-card-skeleton";
+import { CompleteRegistrationForm } from "@/components/auth/password-forms";
+import { TokenProblem } from "@/components/auth/token-problem";
+import { getVerifyTokenState } from "@/server/auth/queries";
 
-export const metadata: Metadata = { title: "Mail doğrulama" };
+export const metadata: Metadata = { title: "Mail doğrulama", robots: { index: false } };
 
-// Token validation and password creation are wired in F1.
-export default function VerifyEmailPage() {
-  const passwordId = useId();
-  const kvkkId = useId();
+async function VerifyContent({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params;
+  const tokenState = await getVerifyTokenState(token);
+  if (tokenState.status !== "valid") {
+    return <TokenProblem status={tokenState.status} retryHref="/kayit" />;
+  }
   return (
     <AuthCard title="Şifrenizi belirleyin" description="Hesabınız bu adımdan sonra aktif olur.">
-      <PlaceholderForm className="space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor={passwordId}>Yeni şifre</Label>
-          <PasswordInput id={passwordId} name="password" autoComplete="new-password" />
-        </div>
-        <div className="flex items-start gap-2.5 py-1.5">
-          <Checkbox id={kvkkId} name="kvkk" className="mt-0.5" />
-          <Label htmlFor={kvkkId} className="text-sm leading-snug font-normal">
-            KVKK aydınlatma metnini okudum, onaylıyorum.
-          </Label>
-        </div>
-        <Button type="submit" size="lg" className="h-11 w-full text-sm">
-          Hesabı etkinleştir
-        </Button>
-      </PlaceholderForm>
+      <CompleteRegistrationForm token={token} email={tokenState.email} />
     </AuthCard>
+  );
+}
+
+export default function VerifyEmailPage({ params }: { params: Promise<{ token: string }> }) {
+  return (
+    <Suspense fallback={<AuthCardSkeleton />}>
+      <VerifyContent params={params} />
+    </Suspense>
   );
 }
