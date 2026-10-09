@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Inter, Source_Serif_4 } from "next/font/google";
 
+import { Toaster } from "@/components/ui/sonner";
 import { APP_NAME, APP_TAGLINE } from "@/config/app";
 
 import "./globals.css";
@@ -47,7 +48,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="tr"
       className={`${inter.variable} ${sourceSerif.variable} ${geistMono.variable} h-full`}
     >
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        {children}
+        <Toaster position="top-center" />
+      </body>
     </html>
   );
 }

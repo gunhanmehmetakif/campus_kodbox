@@ -68,6 +68,16 @@ export function MailHelpDialog() {
             Bu adrese üniversitenin e-posta girişinden, okul mail şifrenizle ulaşabilirsiniz. Şifrenizi bilmiyorsanız
             üniversitenin bilgi işlem birimine başvurun.
           </p>
+          <p>
+            <a
+              href="https://ogrposta.mku.edu.tr/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-11 items-center font-medium text-primary underline underline-offset-4 hover:no-underline"
+            >
+              Öğrenci posta girişini aç (ogrposta.mku.edu.tr)
+            </a>
+          </p>
           <p>Mail birkaç dakika içinde gelmezse gereksiz (spam) klasörüne de bakın.</p>
         </div>
       </DialogContent>

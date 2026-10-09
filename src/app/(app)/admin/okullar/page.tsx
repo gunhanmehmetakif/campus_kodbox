@@ -1,18 +1,25 @@
 import type { Metadata } from "next";
-import { School } from "lucide-react";
+import { Suspense } from "react";
 
-import { PlaceholderPage } from "@/components/common/placeholder-page";
+import { SchoolForm } from "@/components/admin/school-form";
+import { PageHeader } from "@/components/common/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
+import { getSchoolSettings } from "@/server/admin/queries";
 
 export const metadata: Metadata = { title: "Okullar" };
 
+async function SchoolContent() {
+  const school = await getSchoolSettings();
+  return <SchoolForm school={school} />;
+}
+
 export default function AdminSchoolsPage() {
   return (
-    <PlaceholderPage
-      title="Okullar"
-      description="Okul mail alan adları ve numara kuralları."
-      emptyTitle="Henüz okul tanımlı değil"
-      emptyDescription="Okul eklediğinizde burada listelenir."
-      icon={School}
-    />
+    <div className="mx-auto max-w-2xl space-y-6">
+      <PageHeader title="Okul ayarları" description="Okul adı ve öğrenci numarası kuralı." />
+      <Suspense fallback={<Skeleton className="h-96 w-full rounded-xl" />}>
+        <SchoolContent />
+      </Suspense>
+    </div>
   );
 }
