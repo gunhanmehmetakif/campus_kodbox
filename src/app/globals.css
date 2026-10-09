@@ -1,26 +1,340 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+ * Kodbox tasarım token'ları — kaynak: DESIGN.md
+ * ------------------------------------------------
+ * Bu dosya, uygulamadaki TÜM renklerin tek kaynağıdır. Bileşenlerde hex/rgb yazılmaz;
+ * Tailwind sınıfları (bg-surface, text-ink-soft, border-line, text-laurel …) veya
+ * CSS değişkenleri (var(--laurel)) kullanılır.
+ *
+ * Tema: varsayılan olarak `prefers-color-scheme` izlenir. Kullanıcı tema anahtarıyla
+ * <html data-theme="light|dark"> ayarlarsa sistem tercihi ezilir.
+ */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* `dark:` varyantı: açık data-theme="dark" VEYA (data-theme="light" değilken) sistem karanlık */
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
+      @slot;
+    }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ---------- Ham token'lar (DESIGN.md tablosu) ---------- */
+:root {
+  color-scheme: light;
+
+  --ink: #13203a;
+  --ink-soft: #4a5872;
+  --paper: #f4f6f9;
+  --surface: #ffffff;
+  --line: #dde2ea;
+  --laurel: #1e6b57;
+  --laurel-tint: #e3f1ec;
+  --saffron: #c98512;
+  --saffron-tint: #fbf0dc;
+  --brick: #b83a28;
+  --brick-tint: #f8e4e0;
+  --sky: #2d5bb8;
+
+  /* Türetilmiş token'lar (DESIGN.md'de yok; yukarıdakilerden türetildi) */
+  --on-accent: #ffffff; /* laurel/brick/sky dolgu üstündeki metin */
+  /* Saffron küçük metinde açık zeminde yetersiz kontrast verir (≈3:1); metin için koyulaştırılmış hali (≈5:1) */
+  --saffron-ink: color-mix(in oklab, var(--saffron) 70%, var(--ink));
+  --sky-tint: color-mix(in oklab, var(--sky) 12%, var(--surface));
+  --line-strong: color-mix(in oklab, var(--line) 70%, var(--ink-soft));
+  --surface-sunken: color-mix(in oklab, var(--paper) 60%, var(--line));
+  --tessera-base: var(--ink);
+  /* Auth paneli her temada koyu: sabit açık metin + DESIGN.md karanlık paletinden taş renkleri */
+  --tessera-fg: #eef1f6;
+  --tessera-laurel: #4fb394;
+  --tessera-saffron: #e8b04b;
+  --tessera-sky: #7ea2e8;
+  --tessera-brick: #e5735f;
+  /* Modal/sheet arka perdesi */
+  --scrim: color-mix(in oklab, var(--ink) 38%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --ink: #e6eaf2;
+    --ink-soft: #a3aec2;
+    --paper: #0e1525;
+    --surface: #151e31;
+    --line: #26324a;
+    --laurel: #4fb394;
+    --laurel-tint: #16352e;
+    --saffron: #e8b04b;
+    --saffron-tint: #3a2c12;
+    --brick: #e5735f;
+    --brick-tint: #3b1b16;
+    --sky: #7ea2e8;
+
+    --on-accent: #0e1525;
+    --saffron-ink: var(--saffron);
+    --tessera-base: #0a101d;
+    --scrim: color-mix(in oklab, #04070d 65%, transparent);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --ink: #e6eaf2;
+  --ink-soft: #a3aec2;
+  --paper: #0e1525;
+  --surface: #151e31;
+  --line: #26324a;
+  --laurel: #4fb394;
+  --laurel-tint: #16352e;
+  --saffron: #e8b04b;
+  --saffron-tint: #3a2c12;
+  --brick: #e5735f;
+  --brick-tint: #3b1b16;
+  --sky: #7ea2e8;
+
+  --on-accent: #0e1525;
+  --saffron-ink: var(--saffron);
+  --tessera-base: #0a101d;
+  --scrim: color-mix(in oklab, #04070d 65%, transparent);
+}
+
+/* ---------- shadcn/ui semantik değişkenleri → Kodbox token'ları ---------- */
+:root {
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: var(--laurel);
+  --primary-foreground: var(--on-accent);
+  --secondary: var(--surface-sunken);
+  --secondary-foreground: var(--ink);
+  --muted: var(--paper);
+  --muted-foreground: var(--ink-soft);
+  --accent: var(--paper);
+  --accent-foreground: var(--ink);
+  --destructive: var(--brick);
+  --border: var(--line);
+  --input: var(--line-strong);
+  --ring: var(--laurel);
+  --chart-1: var(--laurel);
+  --chart-2: var(--sky);
+  --chart-3: var(--saffron);
+  --chart-4: var(--brick);
+  --chart-5: var(--ink-soft);
+  --radius: 10px;
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--laurel);
+  --sidebar-primary-foreground: var(--on-accent);
+  --sidebar-accent: var(--laurel-tint);
+  --sidebar-accent-foreground: var(--laurel);
+  --sidebar-border: var(--line);
+  --sidebar-ring: var(--laurel);
+}
+
+/* ---------- Tailwind tema eşlemesi ---------- */
+@theme inline {
+  /* Kodbox token'ları: bg-paper, text-ink, border-line, bg-laurel-tint … */
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-laurel: var(--laurel);
+  --color-laurel-tint: var(--laurel-tint);
+  --color-saffron: var(--saffron);
+  --color-saffron-tint: var(--saffron-tint);
+  --color-saffron-ink: var(--saffron-ink);
+  --color-brick: var(--brick);
+  --color-brick-tint: var(--brick-tint);
+  --color-sky: var(--sky);
+  --color-sky-tint: var(--sky-tint);
+  --color-on-accent: var(--on-accent);
+  --color-scrim: var(--scrim);
+  --color-tessera: var(--tessera-base);
+  --color-tessera-fg: var(--tessera-fg);
+  --color-tessera-laurel: var(--tessera-laurel);
+  --color-tessera-saffron: var(--tessera-saffron);
+  --color-tessera-sky: var(--tessera-sky);
+  --color-tessera-brick: var(--tessera-brick);
+
+  /* shadcn/ui semantik renkleri */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Fontlar (next/font değişkenleri layout.tsx'te tanımlanır) */
+  --font-sans: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-schibsted-grotesk), var(--font-instrument-sans), ui-sans-serif, sans-serif;
+  --font-heading: var(--font-schibsted-grotesk), var(--font-instrument-sans), ui-sans-serif, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Köşe yarıçapları: input/buton 8px (lg), kart 10px (xl) */
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-2xl: 14px;
+  --radius-3xl: 20px;
+  --radius-4xl: 9999px;
+}
+
+/*
+ * Tipografi ölçeği (DESIGN.md): 12 / 13 / 14 (gövde) / 16 / 20 / 24 / 32 / 44
+ * Tailwind'in varsayılan ölçeği tamamen kaldırılıp yalnızca bu adımlar tanımlanır.
+ *   text-xs 12 · text-label 13 · text-sm 14 (gövde) · text-base 16
+ *   text-lg 20 · text-xl 24 · text-2xl 32 · text-3xl 44
+ */
+@theme {
+  --text-*: initial;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.45;
+  --text-label: 0.8125rem;
+  --text-label--line-height: 1.45;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.55;
+  --text-base: 1rem;
+  --text-base--line-height: 1.55;
+  --text-lg: 1.25rem;
+  --text-lg--line-height: 1.3;
+  --text-xl: 1.5rem;
+  --text-xl--line-height: 1.2;
+  --text-2xl: 2rem;
+  --text-2xl--line-height: 1.15;
+  --text-3xl: 2.75rem;
+  --text-3xl--line-height: 1.1;
+
+  --tracking-heading: -0.01em;
+
+  /* Düzen ölçüleri */
+  --spacing-sidebar: 248px;
+  --container-content: 1120px;
+
+  --animate-ribbon-pulse: ribbon-pulse 2s ease-in-out infinite;
+
+  @keyframes ribbon-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
+    }
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring;
+  }
+  html {
+    @apply font-sans;
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-paper text-sm text-ink antialiased;
+    line-height: 1.55;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display;
+    line-height: 1.15;
+    letter-spacing: var(--tracking-heading);
+    text-wrap: balance;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  /* Odak halkası: 2px laurel, 2px offset (DESIGN.md · Bileşen kuralları) */
+  :focus-visible {
+    outline: 2px solid var(--laurel);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--laurel-tint);
+    color: var(--ink);
+  }
+  /* Mono veriler (öğrenci no, ders kodu, tarih, sayaç) hep tabular */
+  .font-mono,
+  code,
+  kbd,
+  samp,
+  pre {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1, "zero" 0;
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  /* Ekranda gizli, ekran okuyucuda görünür */
+  .sr-only-focusable:not(:focus):not(:focus-within) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

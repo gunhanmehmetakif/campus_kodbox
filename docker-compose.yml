@@ -1,0 +1,30 @@
+# Kodbox yerel geliştirme servisleri.
+#   docker compose up -d      → Postgres'i başlatır (host portu 5433)
+#   docker compose down       → durdurur (veri "kodbox-pgdata" volume'ünde kalır)
+#   docker compose down -v    → veriyle birlikte siler
+name: mku-kodbox
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: mku-kodbox-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kodbox
+      POSTGRES_PASSWORD: kodbox
+      POSTGRES_DB: kodbox
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "5433:5432"
+    volumes:
+      - kodbox-pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kodbox -d kodbox"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  kodbox-pgdata:
