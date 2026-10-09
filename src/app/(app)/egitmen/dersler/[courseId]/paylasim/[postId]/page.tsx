@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import { ArrowLeft, Lock } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 
 import { EmptyState } from "@/components/common/empty-state";
 import { PageHeader } from "@/components/common/page-header";
+import { PageSkeleton } from "@/components/common/page-skeleton";
 import { PostEditor } from "@/components/courses/post-editor";
 import { isUuid } from "@/components/courses/utils";
 import { Button } from "@/components/ui/button";
@@ -12,7 +14,17 @@ import { getCoursePost, getMyCourse } from "@/server/courses/queries";
 
 export const metadata: Metadata = { title: "Paylaşımı düzenle" };
 
-export default async function EditPostPage({ params }: PageProps<"/egitmen/dersler/[courseId]/paylasim/[postId]">) {
+type Props = PageProps<"/egitmen/dersler/[courseId]/paylasim/[postId]">;
+
+export default function EditPostPage({ params }: Props) {
+  return (
+    <Suspense fallback={<PageSkeleton variant="list" />}>
+      <EditPost params={params} />
+    </Suspense>
+  );
+}
+
+async function EditPost({ params }: Pick<Props, "params">) {
   const { courseId, postId } = await params;
   if (!isUuid(courseId) || !isUuid(postId)) notFound();
   const [course, post] = await Promise.all([getMyCourse(courseId), getCoursePost(postId)]);

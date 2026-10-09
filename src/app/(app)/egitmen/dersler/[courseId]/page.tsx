@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { Archive, ClipboardList, Pencil } from "lucide-react";
+import { Archive, Pencil } from "lucide-react";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
-import { EmptyState } from "@/components/common/empty-state";
+import { AssignmentsTab } from "@/components/assignments/instructor/assignments-tab";
 import { PageHeader } from "@/components/common/page-header";
 import { PageSkeleton } from "@/components/common/page-skeleton";
 import { ArchiveButton } from "@/components/courses/archive-button";
@@ -71,11 +71,7 @@ export default async function InstructorCoursePage({ params, searchParams }: Pag
         ) : tab === "ogrenciler" ? (
           <RosterTab course={course} page={page} filter={filter} studentNo={studentNo} />
         ) : (
-          <EmptyState
-            icon={ClipboardList}
-            title="Ödevler yakında"
-            description="Ödev oluşturma ve teslim takibi bir sonraki aşamada eklenecek."
-          />
+          <AssignmentsTab courseId={course.id} archived={archived} />
         )}
       </Suspense>
     </div>

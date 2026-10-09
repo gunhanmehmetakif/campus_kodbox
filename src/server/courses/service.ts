@@ -15,6 +15,7 @@ import {
   type PostType,
 } from "@/db/schema";
 import { normalizeStudentNo } from "@/lib/identity";
+import type { Page } from "@/lib/page";
 import { audit } from "@/lib/server/audit";
 import { blindIndex, decrypt, decryptNullable, encrypt, encryptNullable } from "@/lib/server/crypto";
 import { notify } from "@/lib/server/notifications";
@@ -29,7 +30,7 @@ import { normalizeCourseCode } from "./schemas";
  */
 
 export type Actor = { id: string; schoolId: string };
-export type Page<T> = { items: T[]; total: number; page: number; pageSize: number };
+export type { Page };
 
 /** Expected, user-facing failure (message is Turkish and shown as is). */
 export class CourseError extends Error {

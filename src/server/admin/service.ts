@@ -8,6 +8,7 @@ import { db } from "@/db";
 import { auditLogs, courses, schools, sessions, terms, users } from "@/db/schema";
 import { normalizeStudentNo, staffEmail } from "@/lib/identity";
 import { maskStudentNo } from "@/lib/mask";
+import type { Page } from "@/lib/page";
 import { audit, type AuditAction } from "@/lib/server/audit";
 import { blindIndex, decrypt, encrypt } from "@/lib/server/crypto";
 import { hashPassword } from "@/lib/server/password";
@@ -24,7 +25,7 @@ import type { CreateInstructorInput, UpdateSchoolInput } from "./schemas";
 
 export class AdminError extends Error {}
 
-export type Page<T> = { items: T[]; total: number; page: number; pageSize: number };
+export type { Page };
 
 export type Actor = { id: string; schoolId: string };
 
