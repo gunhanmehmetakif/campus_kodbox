@@ -1,38 +1,33 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
+import Link from "next/link";
 
-import { AuthHeader } from "@/components/auth/auth-layout";
-import { RegisterForm } from "@/components/auth/register-form";
-import { redirectIfSignedIn } from "@/lib/server/auth";
-import { listSchools, toSchoolIdentity } from "@/lib/server/schools";
-import { getTurnstileSiteKey } from "@/lib/server/turnstile";
-
-import { AuthFormSkeleton } from "../form-skeleton";
+import { AudienceEmailField } from "@/components/auth/audience-email-field";
+import { AuthCard } from "@/components/auth/auth-card";
+import { PlaceholderForm } from "@/components/auth/placeholder-form";
+import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = { title: "Kayıt ol" };
 
-/** Öğrenci kaydı (PLAN.md §2.2). Eğitmenler kayıt olamaz; hesaplarını admin açar. */
 export default function RegisterPage() {
   return (
-    <>
-      <AuthHeader
-        title="Öğrenci kaydı"
-        description="Okul numaranı gir; okul mailine gelen linkle şifreni belirle. Eğitmen hesaplarını yönetici açar."
-      />
-      <Suspense fallback={<AuthFormSkeleton />}>
-        <RegisterContent />
-      </Suspense>
-    </>
-  );
-}
-
-async function RegisterContent() {
-  await redirectIfSignedIn();
-  const schools = await listSchools();
-  return (
-    <RegisterForm
-      schools={schools.map((s) => ({ id: s.id, name: s.name, identity: toSchoolIdentity(s) }))}
-      turnstileSiteKey={getTurnstileSiteKey()}
-    />
+    <AuthCard
+      title="Kayıt ol"
+      description="Öğrenci numaranızı girin. Okul mailinize bir doğrulama linki göndereceğiz."
+    >
+      <div className="space-y-4">
+        <PlaceholderForm className="space-y-4">
+          <AudienceEmailField lockAudience="student" />
+          <Button type="submit" size="lg" className="h-11 w-full text-sm">
+            Doğrulama linki gönder
+          </Button>
+        </PlaceholderForm>
+        <Link
+          href="/giris"
+          className="inline-flex min-h-11 items-center text-sm text-primary underline-offset-4 hover:underline"
+        >
+          Zaten hesabım var
+        </Link>
+      </div>
+    </AuthCard>
   );
 }

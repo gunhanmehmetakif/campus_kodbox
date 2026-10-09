@@ -4,10 +4,7 @@ import { hash, verify } from "@node-rs/argon2";
 
 export { newPasswordSchema, passwordRules, passwordSchema } from "@/lib/password-policy";
 
-/**
- * argon2id parametreleri — OWASP 2024 önerisi (m=19 MiB, t=2, p=1).
- * @node-rs/argon2'de varsayılan algoritma argon2id'dir (Algorithm.Argon2id = 2).
- */
+/** argon2id parameters, OWASP 2024 recommendation (m=19 MiB, t=2, p=1). Algorithm 2 = Argon2id. */
 const ARGON2_OPTIONS = {
   algorithm: 2,
   memoryCost: 19_456,
@@ -16,14 +13,12 @@ const ARGON2_OPTIONS = {
   outputLen: 32,
 } as const;
 
-/** Şifreyi argon2id ile hash'ler. Çıktı PHC biçimindedir ($argon2id$v=19$…), tuz içinde gömülüdür. */
+/** Hashes a password with argon2id. Output is PHC format with the salt embedded. */
 export async function hashPassword(password: string): Promise<string> {
   return hash(password, ARGON2_OPTIONS);
 }
 
-/**
- * Şifreyi hash ile doğrular. Hash bozuksa false döner (hata fırlatmaz).
- */
+/** Verifies a password against a hash. A malformed hash returns false instead of throwing. */
 export async function verifyPassword(passwordHash: string, password: string): Promise<boolean> {
   try {
     return await verify(passwordHash, password);
@@ -33,8 +28,8 @@ export async function verifyPassword(passwordHash: string, password: string): Pr
 }
 
 /**
- * Kullanıcı bulunamadığında da aynı süreyi harcamak için sahte doğrulama
- * (kullanıcı varlığını zamanlama farkıyla sızdırmamak için giriş akışında kullanın).
+ * Dummy verification that burns the same time when the user does not exist, so login timing
+ * does not reveal which accounts exist.
  */
 let dummyHash: Promise<string> | undefined;
 export async function verifyPasswordDummy(password: string): Promise<false> {

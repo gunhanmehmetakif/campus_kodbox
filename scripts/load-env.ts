@@ -1,7 +1,6 @@
 /**
- * Next.js dışındaki betikler (seed, drizzle-kit, vitest) için ortam değişkenlerini
- * Next.js ile AYNI kurallarla yükler (.env.local > .env.{mode} > .env).
- * Betiklerde İLK import olarak kullanılmalıdır.
+ * Loads environment variables for scripts outside Next.js (seed, drizzle-kit) with the same
+ * rules as Next.js (.env.local > .env.{mode} > .env). Must be the FIRST import in scripts.
  */
 import { loadEnvConfig } from "@next/env";
 

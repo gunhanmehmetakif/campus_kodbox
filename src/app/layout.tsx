@@ -1,64 +1,53 @@
 import type { Metadata, Viewport } from "next";
-import { Instrument_Sans, JetBrains_Mono, Schibsted_Grotesk } from "next/font/google";
+import { Geist_Mono, Inter, Source_Serif_4 } from "next/font/google";
 
-import { ThemeScript } from "@/components/theme/theme-script";
-import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { APP_NAME, APP_TAGLINE } from "@/config/app";
 
 import "./globals.css";
 
-/* DESIGN.md · Tipografi — latin-ext alt kümesi Türkçe karakterler (ğ ş ı İ ö ü ç) için şart. */
-const display = Schibsted_Grotesk({
-  variable: "--font-schibsted-grotesk",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin", "latin-ext"],
-  weight: ["600", "700"],
   display: "swap",
 });
 
-const body = Instrument_Sans({
-  variable: "--font-instrument-sans",
+const sourceSerif = Source_Serif_4({
+  variable: "--font-serif",
   subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "600"],
   display: "swap",
 });
 
-const mono = JetBrains_Mono({
-  variable: "--font-jetbrains-mono",
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
   subsets: ["latin", "latin-ext"],
-  weight: ["400", "500"],
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: { default: "Kodbox", template: "%s · Kodbox" },
-  description: "Ders, materyal ve ödev platformu. Derslerin, ödevlerin, teslimlerin — tek yerde.",
-  applicationName: "Kodbox",
-  robots: { index: false, follow: false },
+  title: { default: APP_NAME, template: `%s · ${APP_NAME}` },
+  description: APP_TAGLINE,
+  applicationName: APP_NAME,
+  manifest: "/manifest.webmanifest",
+  icons: { icon: "/icons/icon.svg" },
 };
 
+// Browser chrome color must be a literal value (cannot reference CSS tokens).
 export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F4F6F9" },
-    { media: "(prefers-color-scheme: dark)", color: "#0E1525" },
+    { media: "(prefers-color-scheme: light)", color: "#faf8f3" },
+    { media: "(prefers-color-scheme: dark)", color: "#1c1e29" },
   ],
-  colorScheme: "light dark",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="tr"
-      // Tema betiği <html data-theme> özniteliğini hydration'dan önce ayarlar.
-      suppressHydrationWarning
-      className={`${display.variable} ${body.variable} ${mono.variable}`}
+      className={`${inter.variable} ${sourceSerif.variable} ${geistMono.variable} h-full`}
     >
-      <head>
-        <ThemeScript />
-      </head>
-      <body className="min-h-dvh">
-        <TooltipProvider delayDuration={300}>{children}</TooltipProvider>
-        <Toaster />
-      </body>
+      <body className="flex min-h-full flex-col">{children}</body>
     </html>
   );
 }

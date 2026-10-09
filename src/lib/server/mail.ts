@@ -7,24 +7,18 @@ import { Resend } from "resend";
 
 import { env } from "@/lib/env";
 
-export {
-  accountExistsTemplate,
-  resetPasswordTemplate,
-  verifyEmailTemplate,
-  type MailAudience,
-  type MailContent,
-} from "./mail-templates";
-
 /**
- * Mail gönderimi (PLAN.md §2.5: sistem SADECE kimlik doğrulama maili gönderir).
+ * Mail sending. The system only sends verification and password reset mails (PRD 2.6);
+ * everything else is an in-app notification.
  *
- * - RESEND_API_KEY varsa Resend ile gönderir.
- * - Yoksa (yerel geliştirme) mail gönderilmez: konsola özet yazılır ve tam HTML
- *   `.dev-mail/` klasörüne kaydedilir (tarayıcıda açıp linke tıklayabilirsiniz).
- * - Canlıda (NODE_ENV=production) anahtar yoksa hata fırlatır.
+ * - With RESEND_API_KEY: sends through Resend.
+ * - Without it (local dev): nothing is sent; a summary is logged and the full HTML is written
+ *   to `.dev-mail/` so you can open it in a browser and click the link.
+ * - In production a missing key is an error.
  *
- * @example
- *   await sendMail({ to: email, ...verifyEmailTemplate({ link }) });
+ * Mail templates are added in F1 (verify / reset).
+ *
+ * @example await sendMail({ to: email, subject, html, text })
  */
 
 export type SendMailInput = {
@@ -43,7 +37,7 @@ export const DEV_MAIL_DIR = path.join(process.cwd(), ".dev-mail");
 export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
   if (!env.RESEND_API_KEY) {
     if (env.NODE_ENV === "production") {
-      console.error("[mail] RESEND_API_KEY tanımlı değil; canlıda mail gönderilemez.");
+      console.error("[mail] RESEND_API_KEY is not set; cannot send mail in production.");
       return { ok: false, error: "Mail servisi yapılandırılmamış." };
     }
     return writeDevMail(input);
@@ -59,12 +53,12 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
       text: input.text,
     });
     if (error) {
-      console.error("[mail] Resend hatası", { name: error.name, message: error.message });
+      console.error("[mail] Resend error", { name: error.name, message: error.message });
       return { ok: false, error: error.message };
     }
     return { ok: true, id: data?.id ?? null };
   } catch (error) {
-    console.error("[mail] gönderim başarısız", error);
+    console.error("[mail] send failed", error);
     return { ok: false, error: "Mail gönderilemedi." };
   }
 }
@@ -91,25 +85,23 @@ async function writeDevMail(input: SendMailInput): Promise<SendMailResult> {
     await mkdir(DEV_MAIL_DIR, { recursive: true });
     await writeFile(file, header + input.html, "utf8");
   } catch (error) {
-    console.warn("[mail:dev] .dev-mail klasörüne yazılamadı", error);
+    console.warn("[mail:dev] could not write to .dev-mail", error);
   }
   console.info(
     [
       "",
-      "┌─ [mail:dev] Mail gönderilmedi (RESEND_API_KEY yok) ─────────────────",
-      `│ Kime : ${input.to}`,
-      `│ Konu : ${input.subject}`,
-      `│ Dosya: ${path.relative(process.cwd(), file)}`,
-      "├─────────────────────────────────────────────────────────────────────",
-      ...input.text.split("\n").map((line) => `│ ${line}`),
-      "└─────────────────────────────────────────────────────────────────────",
+      "[mail:dev] Mail not sent (no RESEND_API_KEY)",
+      `  To     : ${input.to}`,
+      `  Subject: ${input.subject}`,
+      `  File   : ${path.relative(process.cwd(), file)}`,
+      ...input.text.split("\n").map((line) => `  | ${line}`),
       "",
     ].join("\n"),
   );
   return { ok: true, id: null };
 }
 
-/** APP_URL'e göre mutlak link üretir (mail içindeki bağlantılar için). */
+/** Absolute URL from APP_URL (for links inside mails). */
 export function absoluteUrl(pathname: string): string {
   return `${env.APP_URL}${pathname.startsWith("/") ? pathname : `/${pathname}`}`;
 }

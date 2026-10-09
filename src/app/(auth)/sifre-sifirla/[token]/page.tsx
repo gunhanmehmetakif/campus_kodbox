@@ -1,26 +1,28 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
+import { useId } from "react";
 
-import { AuthHeader } from "@/components/auth/auth-layout";
-import { SetPasswordForm } from "@/components/auth/set-password-form";
+import { AuthCard } from "@/components/auth/auth-card";
+import { PasswordInput } from "@/components/auth/password-input";
+import { PlaceholderForm } from "@/components/auth/placeholder-form";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 
-import { AuthFormSkeleton } from "../../form-skeleton";
+export const metadata: Metadata = { title: "Şifre sıfırla" };
 
-export const metadata: Metadata = { title: "Yeni şifre" };
-
-/** Şifre sıfırlama linki (PLAN.md §2.3). F1 token doğrulamasını ve action'ı bağlar. */
-export default function ResetPasswordPage({ params }: PageProps<"/sifre-sifirla/[token]">) {
+// Token validation and the reset action are wired in F1.
+export default function ResetPasswordPage() {
+  const passwordId = useId();
   return (
-    <>
-      <AuthHeader title="Yeni şifre belirle" description="Şifren değişince tüm cihazlardaki oturumlar kapanır." />
-      <Suspense fallback={<AuthFormSkeleton fields={2} />}>
-        <ResetContent params={params} />
-      </Suspense>
-    </>
+    <AuthCard title="Yeni şifre belirleyin" description="Sıfırlama linki tek kullanımlıktır.">
+      <PlaceholderForm className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor={passwordId}>Yeni şifre</Label>
+          <PasswordInput id={passwordId} name="password" autoComplete="new-password" />
+        </div>
+        <Button type="submit" size="lg" className="h-11 w-full text-sm">
+          Şifreyi kaydet
+        </Button>
+      </PlaceholderForm>
+    </AuthCard>
   );
-}
-
-async function ResetContent({ params }: { params: PageProps<"/sifre-sifirla/[token]">["params"] }) {
-  const { token } = await params;
-  return <SetPasswordForm mode="reset" token={token} />;
 }

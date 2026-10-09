@@ -8,10 +8,8 @@ import { env } from "@/lib/env";
 import * as schema from "./schema";
 
 /**
- * Uygulama genelinde tek veritabanı bağlantı havuzu.
- *
- * Geliştirmede (HMR) modül her yeniden yüklendiğinde yeni havuz açılmasın diye
- * istemci `globalThis` üzerinde saklanır.
+ * Single database connection pool for the whole app. The client is kept on `globalThis` so
+ * HMR in development does not open a new pool on every module reload.
  */
 type Db = PostgresJsDatabase<typeof schema> & { $client: postgres.Sql };
 
@@ -22,38 +20,36 @@ function createDb(): Db {
     max: env.NODE_ENV === "production" ? 10 : 5,
     idle_timeout: 20,
     connect_timeout: 10,
-    // Tüm zaman damgaları UTC olarak okunur/yazılır.
-    connection: { TimeZone: "UTC", application_name: "kodbox" },
+    // All timestamps are read and written as UTC.
+    connection: { TimeZone: "UTC", application_name: "kodbox-campus" },
     onnotice: () => {},
   });
   return drizzle(client, { schema });
 }
 
 function getDb(): Db {
-  if (globalForDb.__kodboxDb) return globalForDb.__kodboxDb;
-  const instance = createDb();
-  globalForDb.__kodboxDb = instance;
-  return instance;
+  globalForDb.__kodboxDb ??= createDb();
+  return globalForDb.__kodboxDb;
 }
 
 /**
- * Drizzle istemcisi. İlk erişimde bağlanır (build sırasında DB gerekmez).
+ * Drizzle client. Connects on first use (no DB needed at build time).
  * @example const rows = await db.select().from(users)
  */
 export const db: Db = new Proxy({} as Db, {
   get(_target, prop, receiver) {
     const real = getDb();
     const value = Reflect.get(real, prop, receiver === db ? real : receiver);
-    // $client (postgres.Sql) özellikleri olan bir fonksiyondur; bind edilirse .end() vb. kaybolur.
+    // $client (postgres.Sql) is a function with own properties; binding would lose .end() etc.
     if (prop === "$client") return value;
     return typeof value === "function" ? value.bind(real) : value;
   },
 });
 
 export type Database = Db;
-/** `db.transaction(async (tx) => …)` içindeki `tx` tipi. */
+/** Type of `tx` inside `db.transaction(async (tx) => ...)`. */
 export type Transaction = Parameters<Parameters<Db["transaction"]>[0]>[0];
-/** Hem `db` hem `tx` kabul eden yardımcılar için. */
+/** For helpers that accept either `db` or `tx`. */
 export type DbOrTx = Db | Transaction;
 
 export { schema };

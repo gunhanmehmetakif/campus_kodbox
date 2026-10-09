@@ -5,18 +5,14 @@ import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, 
 import { env } from "@/lib/env";
 
 /**
- * Kişisel veri şifreleme ve blind index yardımcıları (PLAN.md §3).
+ * Personal data encryption and blind indexes.
  *
- * ŞİFRELİ METİN BİÇİMİ
- *   v1:<iv base64url>:<ciphertext+authTag base64url>
- *   - AES-256-GCM, 12 byte rastgele IV, 16 byte auth tag.
- *   - "v1" anahtar sürümüdür. Anahtar rotasyonunda yeni sürüm (v2) eklenir; eski sürümle
- *     şifrelenmiş değerler okunmaya devam eder, yeniden yazılırken yeni sürüme geçer.
+ * Ciphertext format: v1:<iv base64url>:<ciphertext+authTag base64url>
+ *   AES-256-GCM, 12 byte random IV, 16 byte auth tag. "v1" is the key version: on rotation a
+ *   new version is added, old values stay readable and move to the new version when rewritten.
  *
- * BLIND INDEX
- *   HMAC-SHA256(BLIND_INDEX_KEY, normalize(value)) → hex (64 karakter).
- *   Normalize: trim + Türkçe'ye duyarsız küçük harf (Unicode NFC). Aynı girdi her zaman aynı
- *   hash'i verir; böylece düz metin saklamadan eşitlik araması yapılabilir.
+ * Blind index: HMAC-SHA256(BLIND_INDEX_KEY, normalize(value)) as hex. Deterministic, so equality
+ * lookups work without storing plaintext.
  */
 
 const ALGORITHM = "aes-256-gcm";
@@ -27,9 +23,7 @@ const CURRENT_KEY_VERSION = "v1";
 let keyring: Map<string, Buffer> | undefined;
 
 function getKeyring(): Map<string, Buffer> {
-  if (!keyring) {
-    keyring = new Map([[CURRENT_KEY_VERSION, Buffer.from(env.DATA_ENCRYPTION_KEY, "base64")]]);
-  }
+  keyring ??= new Map([[CURRENT_KEY_VERSION, Buffer.from(env.DATA_ENCRYPTION_KEY, "base64")]]);
   return keyring;
 }
 
@@ -39,7 +33,7 @@ function getBlindIndexKey(): Buffer {
   return blindKey;
 }
 
-/** Düz metni AES-256-GCM ile şifreler. Sonuç `v1:…:…` biçiminde, DB'ye yazılabilir string'dir. */
+/** Encrypts plaintext with AES-256-GCM. Returns a `v1:…:…` string safe to store. */
 export function encrypt(plaintext: string): string {
   const key = getKeyring().get(CURRENT_KEY_VERSION)!;
   const iv = randomBytes(IV_LENGTH);
@@ -48,20 +42,17 @@ export function encrypt(plaintext: string): string {
   return `${CURRENT_KEY_VERSION}:${iv.toString("base64url")}:${ciphertext.toString("base64url")}`;
 }
 
-/**
- * `encrypt` çıktısını çözer. Biçim bozuksa, anahtar yanlışsa veya veri değiştirilmişse hata fırlatır
- * (GCM bütünlük doğrulaması).
- */
+/** Decrypts `encrypt` output. Throws on malformed input, wrong key or tampered data. */
 export function decrypt(payload: string): string {
   const parts = payload.split(":");
-  if (parts.length !== 3) throw new Error("Şifreli değer biçimi geçersiz.");
+  if (parts.length !== 3) throw new Error("Invalid ciphertext format.");
   const [version, ivPart, dataPart] = parts as [string, string, string];
   const key = getKeyring().get(version);
-  if (!key) throw new Error(`Bilinmeyen şifreleme anahtarı sürümü: ${version}`);
+  if (!key) throw new Error(`Unknown encryption key version: ${version}`);
 
   const iv = Buffer.from(ivPart, "base64url");
   const data = Buffer.from(dataPart, "base64url");
-  if (iv.length !== IV_LENGTH || data.length < TAG_LENGTH) throw new Error("Şifreli değer biçimi geçersiz.");
+  if (iv.length !== IV_LENGTH || data.length < TAG_LENGTH) throw new Error("Invalid ciphertext format.");
 
   const decipher = createDecipheriv(ALGORITHM, key, iv, { authTagLength: TAG_LENGTH });
   decipher.setAuthTag(data.subarray(data.length - TAG_LENGTH));
@@ -70,64 +61,60 @@ export function decrypt(payload: string): string {
   );
 }
 
-/** null/undefined geçirgen varyantlar (nullable sütunlar için). */
 export function encryptNullable(value: string | null | undefined): string | null {
   return value == null ? null : encrypt(value);
 }
+
 export function decryptNullable(value: string | null | undefined): string | null {
   return value == null ? null : decrypt(value);
 }
 
-/** Blind index öncesi normalizasyon: trim + NFC + küçük harf (tr-TR değil, locale'den bağımsız). */
+/** Normalization before hashing: NFC + trim + lowercase (locale independent). */
 export function normalizeForIndex(value: string): string {
   return value.normalize("NFC").trim().toLowerCase();
 }
 
 /**
- * Aranabilir, deterministik HMAC-SHA256 blind index (hex).
+ * Deterministic searchable hash (hex, 64 chars).
  * @example users.emailHash = blindIndex(email); users.studentNoHash = blindIndex(studentNo)
  */
 export function blindIndex(value: string): string {
   return createHmac("sha256", getBlindIndexKey()).update(normalizeForIndex(value), "utf8").digest("hex");
 }
 
-/** Maskeleme saf fonksiyonlardır; kolaylık için buradan da dışa aktarılır (bkz. src/lib/mask.ts). */
 export { maskEmail, maskStudentNo } from "@/lib/mask";
 
-/* ──────────────────────────── Token yardımcıları ──────────────────────────── */
+/* ──────────────────────────── Tokens ──────────────────────────── */
 
-/** Kriptografik rastgele, URL-güvenli token (varsayılan 32 byte = 256 bit). */
+/** Cryptographically random URL-safe token (default 32 bytes = 256 bit). */
 export function generateToken(bytes = 32): string {
   return randomBytes(bytes).toString("base64url");
 }
 
-/** SHA-256 hex. Oturum ve mail token'larını DB'de saklarken kullanılır (token'ın kendisi saklanmaz). */
+/** SHA-256 hex. Session and email tokens are stored hashed, never raw. */
 export function sha256Hex(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
-/** Sabit zamanlı string karşılaştırma (uzunluk farkını da sızdırmadan). */
+/** Constant-time string comparison. */
 export function safeEqual(a: string, b: string): boolean {
   const ha = createHash("sha256").update(a).digest();
   const hb = createHash("sha256").update(b).digest();
   return timingSafeEqual(ha, hb) && a.length === b.length;
 }
 
-/* ─────────────────────────── İmzalı değerler (SESSION_SECRET) ─────────────────────────── */
+/* ─────────────────────── Signed values (SESSION_SECRET) ─────────────────────── */
 
 function hmacSign(value: string): string {
   return createHmac("sha256", env.SESSION_SECRET).update(value, "utf8").digest("base64url");
 }
 
-/**
- * Değeri HMAC ile imzalar: `${value}.${imza}`. Gizli değil, sadece değiştirilemez yapar.
- * Kullanım: OAuth state / kısa ömürlü çerezler.
- */
+/** Signs a value as `${value}.${mac}`: tamper-proof, not secret (OAuth state, short-lived cookies). */
 export function sign(value: string): string {
   return `${value}.${hmacSign(value)}`;
 }
 
-/** `sign` çıktısını doğrular; geçerliyse orijinal değeri, değilse null döner. */
+/** Verifies `sign` output; returns the original value or null. */
 export function unsign(signed: string): string | null {
   const idx = signed.lastIndexOf(".");
   if (idx <= 0) return null;
@@ -135,7 +122,7 @@ export function unsign(signed: string): string | null {
   return safeEqual(signed.slice(idx + 1), hmacSign(value)) ? value : null;
 }
 
-/** Testler için anahtar önbelleklerini temizler. */
+/** For tests: clears key caches. */
 export function __resetCryptoCacheForTests() {
   keyring = undefined;
   blindKey = undefined;

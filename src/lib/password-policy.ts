@@ -1,9 +1,8 @@
 import { z } from "zod";
 
 /**
- * Parola politikası (saf; istemci formlarında canlı ipucu için de kullanılabilir).
- * Kural: en az 8 karakter, en az bir harf ve en az bir rakam. En fazla 128 karakter
- * (argon2'ye aşırı uzun girdi verilmesini önler).
+ * Password policy (pure; usable for live hints in client forms).
+ * At least 8 characters with one letter and one digit; max 128 to keep argon2 input bounded.
  */
 export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_LENGTH = 128;
@@ -21,7 +20,7 @@ export const passwordSchema = z
   .refine((v) => /\p{L}/u.test(v), "Şifre en az bir harf içermeli.")
   .refine((v) => /\p{Nd}/u.test(v), "Şifre en az bir rakam içermeli.");
 
-/** Yeni şifre + tekrar alanları için şema (eşleşmezse `confirmPassword` alanına hata yazar). */
+/** New password + confirmation; a mismatch is reported on `confirmPassword`. */
 export const newPasswordSchema = z
   .object({
     password: passwordSchema,

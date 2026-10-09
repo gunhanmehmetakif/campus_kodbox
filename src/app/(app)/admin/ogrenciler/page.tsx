@@ -1,13 +1,18 @@
-import { GraduationCapIcon } from "lucide-react";
 import type { Metadata } from "next";
+import { Users } from "lucide-react";
 
-import { SectionPlaceholder } from "@/components/section-placeholder";
-import { requireRole } from "@/lib/server/auth";
+import { PlaceholderPage } from "@/components/common/placeholder-page";
 
 export const metadata: Metadata = { title: "Öğrenciler" };
 
-/** Öğrenciler — F2. */
-export default async function AdminStudentsPage() {
-  await requireRole("admin");
-  return <SectionPlaceholder title="Öğrenciler" description="Maskeli numarayla arama, hesap durumu, devre dışı bırakma." phase="F2" icon={GraduationCapIcon} />;
+export default function AdminStudentsPage() {
+  return (
+    <PlaceholderPage
+      title="Öğrenciler"
+      description="Numaralar maskeli gösterilir."
+      emptyTitle="Kayıtlı öğrenci yok"
+      emptyDescription="Öğrenciler kayıt oldukça burada listelenir."
+      icon={Users}
+    />
+  );
 }

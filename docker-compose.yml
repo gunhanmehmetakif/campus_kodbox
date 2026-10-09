@@ -1,4 +1,4 @@
-# Kodbox yerel geliştirme servisleri.
+# Kodbox Campus yerel geliştirme servisleri.
 #   docker compose up -d      → Postgres'i başlatır (host portu 5433)
 #   docker compose down       → durdurur (veri "kodbox-pgdata" volume'ünde kalır)
 #   docker compose down -v    → veriyle birlikte siler

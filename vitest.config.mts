@@ -3,22 +3,24 @@ import path from "node:path";
 import { defineConfig } from "vitest/config";
 
 /**
- * Birim testleri: `*.test.ts` dosyaları test ettikleri modülün YANINDA durur.
- * DB entegrasyon testleri (`*.db.test.ts`) TEST_DATABASE_URL erişilebilirse çalışır, yoksa atlanır.
+ * Unit tests live in tests/unit, DB integration tests in tests/db (*.db.test.ts). DB tests
+ * run against the test database and are skipped when it is unreachable.
  */
 export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "src"),
-      // "server-only" Next dışında hata fırlatır; testlerde boş modüle yönlendirilir.
-      "server-only": path.resolve(import.meta.dirname, "test/server-only-stub.ts"),
+      // "server-only" throws outside Next; point it at an empty module in tests.
+      "server-only": path.resolve(import.meta.dirname, "tests/server-only-stub.ts"),
     },
   },
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
-    setupFiles: ["./test/setup.ts"],
+    include: ["tests/unit/**/*.test.ts", "tests/db/**/*.test.ts"],
+    setupFiles: ["./tests/setup.ts"],
     restoreMocks: true,
     testTimeout: 15_000,
+    // DB tests share one test database.
+    fileParallelism: false,
   },
 });

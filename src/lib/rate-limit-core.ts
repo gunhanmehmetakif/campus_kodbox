@@ -1,18 +1,17 @@
 /**
- * Sabit pencere (fixed window) rate limit algoritması — saf fonksiyon.
- * DB uygulaması: src/lib/server/rate-limit.ts (bu fonksiyonu satır kilidiyle kullanır).
+ * Fixed-window rate limit algorithm (pure).
+ * DB implementation: src/lib/server/rate-limit.ts (applies this under a row lock).
  */
 
 export type RateLimitWindow = { count: number; windowStart: Date };
 
 export type RateLimitDecision = {
-  /** İstek izinli mi? */
   ok: boolean;
-  /** Bu pencerede kalan hak (izinliyse). */
+  /** Remaining allowance in this window (when ok). */
   remaining: number;
-  /** Engellendiyse kaç saniye sonra tekrar denenebilir; izinliyse 0. */
+  /** Seconds until retry is possible when blocked; 0 when ok. */
   retryAfter: number;
-  /** Kaydedilecek yeni durum. */
+  /** State to persist. */
   next: RateLimitWindow;
 };
 
@@ -25,9 +24,9 @@ function secondsUntilWindowEnd(windowStart: Date, now: Date, windowMs: number): 
 }
 
 /**
- * Bir isteği sayar ve karar verir.
- * - Önceki pencere yoksa, süresi dolduysa (veya saat geri kaydıysa) yeni pencere `now` ile başlar.
- * - Sayaç `limit + 1`'de doyar: engellenen istekler sayacı şişirmez ve pencereyi uzatmaz.
+ * Counts one request and decides. A new window starts when none exists, the old one expired,
+ * or the clock moved backwards. The counter saturates at `limit + 1` so blocked requests do
+ * not inflate it or extend the window.
  */
 export function decideRateLimit(
   prev: RateLimitWindow | null,
@@ -35,8 +34,8 @@ export function decideRateLimit(
   limit: number,
   windowSec: number,
 ): RateLimitDecision {
-  if (!Number.isInteger(limit) || limit < 1) throw new Error("limit pozitif tam sayı olmalı");
-  if (!(windowSec > 0)) throw new Error("windowSec pozitif olmalı");
+  if (!Number.isInteger(limit) || limit < 1) throw new Error("limit must be a positive integer");
+  if (!(windowSec > 0)) throw new Error("windowSec must be positive");
 
   const windowMs = windowSec * 1000;
   const expired = isExpired(prev, now, windowMs);
@@ -52,7 +51,7 @@ export function decideRateLimit(
   };
 }
 
-/** Saymadan mevcut durumu değerlendirir (ör. "hesap kilitli mi?" kontrolü). */
+/** Evaluates the current state without counting (e.g. "is the account locked?"). */
 export function peekRateLimit(
   prev: RateLimitWindow | null,
   now: Date,
@@ -69,7 +68,7 @@ export function peekRateLimit(
   };
 }
 
-/** Bekleme süresini Türkçe metne çevirir: "45 saniye", "3 dakika", "2 saat". */
+/** Turkish wait text: "45 saniye", "3 dakika", "2 saat". */
 export function formatRetryAfter(seconds: number): string {
   const s = Math.max(1, Math.ceil(seconds));
   if (s < 60) return `${s} saniye`;

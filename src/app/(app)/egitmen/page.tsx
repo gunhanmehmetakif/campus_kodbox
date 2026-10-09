@@ -1,33 +1,30 @@
-import { BookOpenIcon } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
+import { BookOpen, ClipboardCheck } from "lucide-react";
 
-import { EmptyState } from "@/components/empty-state";
-import { SectionPlaceholder } from "@/components/section-placeholder";
-import { Button } from "@/components/ui/button";
-import { requireRole } from "@/lib/server/auth";
+import { DashboardSection } from "@/components/common/dashboard-section";
+import { EmptyState } from "@/components/common/empty-state";
+import { PageHeader } from "@/components/common/page-header";
 
 export const metadata: Metadata = { title: "Panel" };
 
-/** Eğitmen paneli — F3/F4 dolduracak: derslerim, kontrol bekleyen teslimler. */
-export default async function InstructorHomePage() {
-  const user = await requireRole("instructor");
+export default function InstructorHomePage() {
   return (
-    <SectionPlaceholder
-      title={user.displayName ? `Hoş geldiniz, ${user.displayName}` : "Hoş geldiniz"}
-      description="Dersleriniz ve kontrol bekleyen teslimler burada."
-      phase="F3"
-    >
-      <EmptyState
-        icon={BookOpenIcon}
-        title="Henüz ders yok"
-        description="İlk dersinizi oluşturup öğrencilerinizi ekleyin."
-        action={
-          <Button asChild>
-            <Link href="/egitmen/dersler">Ders oluştur</Link>
-          </Button>
-        }
-      />
-    </SectionPlaceholder>
+    <div className="space-y-8">
+      <PageHeader title="Panel" description="Puanlanmayı bekleyen teslimler ve derslerinizin özeti." />
+      <DashboardSection title="Puanlanmayı bekleyenler">
+        <EmptyState
+          icon={ClipboardCheck}
+          title="Bekleyen teslim yok"
+          description="Öğrenciler ödev teslim ettikçe burada görünür."
+        />
+      </DashboardSection>
+      <DashboardSection title="Derslerim">
+        <EmptyState
+          icon={BookOpen}
+          title="Henüz ders açmadınız"
+          description="Yeni ders oluşturduğunuzda öğrenci numaralarını yapıştırarak ekleyebilirsiniz."
+        />
+      </DashboardSection>
+    </div>
   );
 }

@@ -4,12 +4,11 @@ import { db, type DbOrTx } from "@/db";
 import { auditLogs } from "@/db/schema";
 
 /**
- * Denetim kaydı (PLAN.md §7). Kritik işlemler — hesap oluşturma/devre dışı bırakma, şifre
- * sıfırlama, rol/okul/dönem değişiklikleri, toplu arşivleme, puan yayınlama — kaydedilir.
+ * Audit log. Critical actions (account create/disable, password reset, role/school/term
+ * changes, bulk archive, score publishing) are recorded.
  *
- * Kurallar
- * - `metadata`'ya düz mail / öğrenci no YAZILMAZ. Gerekirse maskEmail / maskStudentNo kullanın.
- * - İşlem bir transaction içindeyse `tx` geçirin; işlem geri alınırsa kayıt da geri alınır.
+ * - Never put plaintext email / student no in `metadata`; use ids or maskEmail/maskStudentNo.
+ * - Inside a transaction pass `tx`, so a rollback also drops the record.
  *
  * @example await audit(admin.id, "instructor.create", { type: "user", id: newUser.id }, { displayName })
  */

@@ -1,22 +1,18 @@
-import { BellIcon } from "lucide-react";
 import type { Metadata } from "next";
+import { Bell } from "lucide-react";
 
-import { SectionPlaceholder } from "@/components/section-placeholder";
-import { requireUser } from "@/lib/server/auth";
+import { PlaceholderPage } from "@/components/common/placeholder-page";
 
 export const metadata: Metadata = { title: "Bildirimler" };
 
-/** Tüm bildirimler listesi — F6. */
-export default async function NotificationsPage() {
-  await requireUser();
+export default function NotificationsPage() {
   return (
-    <SectionPlaceholder
+    <PlaceholderPage
       title="Bildirimler"
-      description="Ders, ödev ve puan bildirimlerin."
-      phase="F6"
-      icon={BellIcon}
-      emptyTitle="Yeni bildirim yok"
-      emptyDescription="Yeni bir duyuru, ödev veya puan yayınlandığında burada görünür."
+      description="Duyuru, ödev ve puan bildirimleriniz."
+      emptyTitle="Henüz bildiriminiz yok"
+      emptyDescription="Yeni bir gelişme olduğunda burada göreceksiniz."
+      icon={Bell}
     />
   );
 }

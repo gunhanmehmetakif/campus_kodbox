@@ -1,8 +1,7 @@
 import type { UserRole } from "@/db/schema";
 
 /**
- * Uygulama rotaları — tek kaynak. Link/redirect yazarken string yerine bunları kullanın.
- * (Saf modül; istemci ve sunucuda kullanılabilir. `@/db/schema` sadece tip olarak içe alınır.)
+ * Application routes, single source. Pure module (client + server); `@/db/schema` is type-only.
  */
 export const routes = {
   home: "/",
@@ -12,21 +11,13 @@ export const routes = {
   verifyEmail: (token: string) => `/dogrula/${encodeURIComponent(token)}`,
   resetPassword: (token: string) => `/sifre-sifirla/${encodeURIComponent(token)}`,
   changePassword: "/sifre-degistir",
-
-  student: {
-    home: "/ogrenci",
-  },
-  instructor: {
-    home: "/egitmen",
-  },
-  admin: {
-    home: "/admin",
-  },
-
-  designGuide: "/_tasarim",
+  account: "/hesap",
+  notifications: "/bildirimler",
+  student: { home: "/ogrenci" },
+  instructor: { home: "/egitmen" },
+  admin: { home: "/admin" },
 } as const;
 
-/** Rolün ana paneli. */
 export function homePathForRole(role: UserRole): string {
   switch (role) {
     case "admin":
@@ -38,24 +29,23 @@ export function homePathForRole(role: UserRole): string {
   }
 }
 
-/** Oturum gerektiren rota önekleri (proxy'nin iyimser kontrolü için). */
+/** Prefixes that need a session (optimistic check in the proxy). */
 export const PROTECTED_PREFIXES = [
   routes.student.home,
   routes.instructor.home,
   routes.admin.home,
+  routes.account,
+  routes.notifications,
   routes.changePassword,
 ] as const;
-
-/** Oturum açıkken anlamsız olan (giriş yapılmışsa panele yönlendirilen) rotalar. */
-export const GUEST_ONLY_PREFIXES = [routes.login, routes.register, routes.forgotPassword] as const;
 
 export function isProtectedPath(pathname: string): boolean {
   return PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
 /**
- * `?next=` gibi kullanıcıdan gelen yönlendirme hedefini doğrular (open redirect'e karşı).
- * Sadece aynı site içi, `/` ile başlayan ve `//` veya `/\` ile başlamayan yollar kabul edilir.
+ * Validates a user supplied redirect target (open redirect protection): same-site paths only,
+ * no `//` or `/\` prefix, no control characters.
  */
 export function safeRedirectPath(next: string | null | undefined, fallback: string = routes.home): string {
   if (!next || typeof next !== "string") return fallback;
@@ -64,7 +54,6 @@ export function safeRedirectPath(next: string | null | undefined, fallback: stri
   return next;
 }
 
-/** Giriş sayfası URL'i (dönüş adresiyle). */
 export function loginUrl(next?: string | null): string {
   const safe = next ? safeRedirectPath(next, "") : "";
   return safe && safe !== routes.home ? `${routes.login}?next=${encodeURIComponent(safe)}` : routes.login;

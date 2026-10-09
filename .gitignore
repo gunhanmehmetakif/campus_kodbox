@@ -41,5 +41,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# kodbox: geliştirme maili çıktısı (RESEND_API_KEY yokken)
+# env files (.env.example is committed)
+
+# local dev mail output
 /.dev-mail/

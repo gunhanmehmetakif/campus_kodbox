@@ -1,36 +1,33 @@
-import { BookOpenIcon, CalendarClockIcon } from "lucide-react";
 import type { Metadata } from "next";
+import { BookOpen, CalendarClock, Megaphone } from "lucide-react";
 
-import { EmptyState } from "@/components/empty-state";
-import { SectionPlaceholder } from "@/components/section-placeholder";
-import { requireRole } from "@/lib/server/auth";
+import { DashboardSection } from "@/components/common/dashboard-section";
+import { EmptyState } from "@/components/common/empty-state";
+import { PageHeader } from "@/components/common/page-header";
 
 export const metadata: Metadata = { title: "Panel" };
 
-/** Öğrenci paneli — F5 dolduracak: yaklaşan teslimler (ortak eksenli şeritler), derslerim, son duyurular. */
-export default async function StudentHomePage() {
-  await requireRole("student");
+export default function StudentHomePage() {
   return (
-    <SectionPlaceholder title="Panelim" description="Yaklaşan teslimlerin, derslerin ve son duyurular burada." phase="F5">
-      <div className="flex flex-col gap-8">
-        <section aria-labelledby="yaklasan" className="flex flex-col gap-3">
-          <h2 id="yaklasan" className="text-base font-semibold">Yaklaşan teslimler</h2>
-          <EmptyState
-            icon={CalendarClockIcon}
-            title="Yaklaşan teslimin yok"
-            description="Bir ödev yayınlandığında son tarihi ve kalan süresi burada görünür."
-          />
-        </section>
-        <section aria-labelledby="derslerim" className="flex flex-col gap-3">
-          <h2 id="derslerim" className="text-base font-semibold">Derslerim</h2>
-          <EmptyState
-            icon={BookOpenIcon}
-            size="sm"
-            title="Henüz bir derse eklenmedin"
-            description="Eğitmenin seni derse eklediğinde ders burada otomatik görünür."
-          />
-        </section>
-      </div>
-    </SectionPlaceholder>
+    <div className="space-y-8">
+      <PageHeader title="Panel" description="Yaklaşan teslimleriniz ve derslerinizi buradan takip edin." />
+      <DashboardSection title="Yaklaşan teslimler">
+        <EmptyState
+          icon={CalendarClock}
+          title="Yaklaşan teslim yok"
+          description="Ödevler eklendikçe en yakın tarihli olan üstte görünür."
+        />
+      </DashboardSection>
+      <DashboardSection title="Derslerim">
+        <EmptyState
+          icon={BookOpen}
+          title="Henüz bir derse eklenmediniz"
+          description="Eğitmeniniz sizi bir derse eklediğinde ders burada görünür."
+        />
+      </DashboardSection>
+      <DashboardSection title="Son duyurular">
+        <EmptyState icon={Megaphone} title="Duyuru yok" description="Derslerinizdeki duyurular burada listelenir." />
+      </DashboardSection>
+    </div>
   );
 }

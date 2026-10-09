@@ -1,21 +1,30 @@
 /**
- * Oturum çerezi sabitleri. `server-only` DEĞİL, çünkü src/proxy.ts de kullanır.
- * Çerezin içinde sadece rastgele token vardır; kullanıcı bilgisi yoktur.
+ * Session cookie constants. NOT `server-only`: src/proxy.ts uses them too.
+ * The cookie holds only a random token, never user data.
  */
 
 const isProd = process.env.NODE_ENV === "production";
 
+/** `__Host-` prefix in production: browser accepts it only with Secure + Path=/ + no Domain. */
+const prefix = isProd ? "__Host-" : "";
+
+export const SESSION_COOKIE_NAME = `${prefix}kodbox_session`;
+
 /**
- * Canlıda `__Host-` öneki: tarayıcı çerezi sadece Secure + Path=/ + Domain'siz kabul eder
- * (alt domain'lerden çerez enjeksiyonuna karşı). Yerelde http olduğu için öneksiz.
+ * Companion flag cookie: present when the user chose "remember me". The proxy refreshes the
+ * session cookie lifetime only when it is set; without it the session cookie ends with the browser.
  */
-export const SESSION_COOKIE_NAME = isProd ? "__Host-kodbox_session" : "kodbox_session";
+export const REMEMBER_COOKIE_NAME = `${prefix}kodbox_remember`;
 
-/** Oturum ömrü: 30 gün (kayan). */
-export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+/** "Remember me" session lifetime: 90 days, sliding. */
+export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 90;
 
-/** Kalan süre bu eşiğin altına düşerse DB'deki bitiş 30 güne uzatılır. */
-export const SESSION_REFRESH_THRESHOLD_SECONDS = 60 * 60 * 24 * 15;
+/** Remaining lifetime below this threshold extends the DB expiry. */
+export const SESSION_REFRESH_THRESHOLD_SECONDS = 60 * 60 * 24 * 45;
+
+/** Non-remembered sessions: cookie ends with the browser; DB expiry is a 24h sliding window. */
+export const SHORT_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24;
+export const SHORT_SESSION_REFRESH_THRESHOLD_SECONDS = 60 * 60 * 12;
 
 export const sessionCookieOptions = {
   httpOnly: true,
@@ -24,5 +33,5 @@ export const sessionCookieOptions = {
   path: "/",
 };
 
-/** Proxy'nin sunucu bileşenlerine istek yolunu ilettiği başlık (bkz. src/proxy.ts). */
+/** Header the proxy uses to pass the request path to server components. */
 export const PATHNAME_HEADER = "x-kodbox-pathname";

@@ -1,28 +1,28 @@
 /**
- * npm run db:reset — YEREL veritabanını tamamen siler (şema + veri), sonra migrate + seed çalışır.
- * Güvenlik: sadece NODE_ENV≠production ve localhost/127.0.0.1 veritabanında çalışır.
+ * npm run db:reset step 1: drops all app tables and drizzle migration state so `db:migrate`
+ * can rebuild from scratch. Refuses to run unless DATABASE_URL points at localhost.
  */
 import "../../../scripts/load-env";
 
 import postgres from "postgres";
 
-async function main() {
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL tanımlı değil.");
-  const host = new URL(url).hostname;
-  if (process.env.NODE_ENV === "production" || !["localhost", "127.0.0.1", "::1"].includes(host)) {
-    throw new Error(`db:reset sadece yerel veritabanında çalışır (host: ${host}).`);
-  }
-  const sql = postgres(url, { max: 1, onnotice: () => {} });
-  try {
-    await sql.unsafe("DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public; DROP SCHEMA IF EXISTS drizzle CASCADE;");
-    console.info(`✓ ${host} üzerindeki veritabanı sıfırlandı.`);
-  } finally {
-    await sql.end({ timeout: 5 });
-  }
+const url = process.env.DATABASE_URL;
+if (!url) throw new Error("DATABASE_URL is not set.");
+const { hostname } = new URL(url);
+if (!["localhost", "127.0.0.1", "::1"].includes(hostname)) {
+  throw new Error(`Refusing to reset a non-local database (${hostname}).`);
 }
 
-main().catch((error) => {
-  console.error("✗ Sıfırlama başarısız:", error instanceof Error ? error.message : error);
-  process.exitCode = 1;
-});
+const sql = postgres(url, { max: 1, onnotice: () => {} });
+
+async function main() {
+  await sql.unsafe("DROP SCHEMA public CASCADE; CREATE SCHEMA public; DROP SCHEMA IF EXISTS drizzle CASCADE;");
+  console.info("Database schema dropped.");
+}
+
+main()
+  .catch((error) => {
+    console.error("Reset failed:", error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  })
+  .finally(() => sql.end({ timeout: 5 }));

@@ -4,15 +4,12 @@ import { connection } from "next/server";
 import { cache } from "react";
 
 /**
- * İstek anı (ms) — sunucu bileşenlerinde "şimdi" için TEK yol.
+ * Request time (ms): the single way to get "now" in server components.
  *
- * - `connection()` ile render'ı istek zamanına bağlar (Cache Components prerender'ında
- *   Date.now() derleme hatası verir; bu yardımcı bunu önler).
- * - React `cache`: aynı istekteki tüm bileşenler AYNI anı görür (tutarlı sayaçlar).
- * - Bileşen gövdesinde doğrudan Date.now() çağırmak react-hooks/purity lint hatasıdır.
+ * `connection()` ties rendering to request time (Date.now() during Cache Components prerender
+ * is a build error). React `cache` makes every component in a request see the same instant.
  *
  *   const now = await getRequestNow();
- *   <DeadlineRibbon … serverNow={now} />
  */
 export const getRequestNow = cache(async (): Promise<number> => {
   await connection();

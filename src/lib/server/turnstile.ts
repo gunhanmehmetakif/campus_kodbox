@@ -6,12 +6,12 @@ import { TURNSTILE_FIELD } from "@/lib/turnstile";
 export { TURNSTILE_FIELD };
 
 /**
- * Cloudflare Turnstile sunucu doğrulaması.
- * İstemci tarafı: components/turnstile-widget.tsx (form içine `cf-turnstile-response` alanı ekler).
+ * Cloudflare Turnstile server verification.
+ * Dev bypass: TURNSTILE_DEV_BYPASS=true skips the remote call (refused in production by env validation).
  *
  * @example
  *   const captcha = await verifyTurnstile(formData.get(TURNSTILE_FIELD), await getClientIp());
- *   if (!captcha.ok) return fail("Robot doğrulaması tamamlanmadı. Kutucuğun yüklenmesini bekleyip tekrar dene.");
+ *   if (!captcha.ok) return fail("Robot doğrulaması tamamlanmadı. Tekrar dene.");
  */
 
 const VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
@@ -22,6 +22,8 @@ export async function verifyTurnstile(
   token: FormDataEntryValue | string | null | undefined,
   ip?: string | null,
 ): Promise<TurnstileResult> {
+  if (env.TURNSTILE_DEV_BYPASS) return { ok: true };
+
   if (typeof token !== "string" || token.length === 0 || token.length > 2048) {
     return { ok: false, errorCodes: ["missing-input-response"] };
   }
@@ -41,12 +43,12 @@ export async function verifyTurnstile(
     const data = (await res.json()) as { success: boolean; "error-codes"?: string[] };
     return data.success ? { ok: true } : { ok: false, errorCodes: data["error-codes"] ?? ["unknown"] };
   } catch (error) {
-    console.error("[turnstile] doğrulama isteği başarısız", error);
+    console.error("[turnstile] verification request failed", error);
     return { ok: false, errorCodes: ["network-error"] };
   }
 }
 
-/** İstemci widget'ına verilecek site anahtarı (sunucu bileşeninden prop olarak geçirin). */
+/** Site key for the client widget (pass from a server component as a prop). */
 export function getTurnstileSiteKey(): string {
   return env.TURNSTILE_SITE_KEY;
 }

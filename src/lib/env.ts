@@ -3,14 +3,12 @@ import "server-only";
 import { z } from "zod";
 
 /**
- * Sunucu ortam değişkenleri — tek doğrulama noktası.
+ * Server environment variables: single validation point.
  *
- * - Değerler İLK ERİŞİMDE doğrulanır (lazy). Böylece `next build` sırasında gizli anahtarlar
- *   olmadan derleme yapılabilir; eksik/yanlış değer çalışma zamanında, ilk kullanımda,
- *   açıklayıcı bir hatayla patlar.
- * - `process.env.X` doğrudan OKUNMAZ; her zaman `env.X` kullanılır.
- * - İstemciye gereken değerler (ör. TURNSTILE_SITE_KEY) NEXT_PUBLIC_ ile gömülmez;
- *   sunucu bileşeni prop olarak geçirir. Böylece aynı imaj farklı ortamlarda çalışır.
+ * - Validated lazily on first access, so `next build` works without secrets; missing or
+ *   invalid values fail at runtime with a descriptive error.
+ * - Never read `process.env.X` directly, always use `env.X`.
+ * - Values needed by the client are passed from server components as props.
  */
 
 const bool = z
@@ -18,7 +16,7 @@ const bool = z
   .default("false")
   .transform((v) => v === "true" || v === "1");
 
-/** Boş string'i "tanımsız" kabul eder (.env dosyalarındaki `KEY=` satırları için). */
+/** Treats empty strings as undefined (`KEY=` lines in .env files). */
 const optionalString = z
   .string()
   .optional()
@@ -26,69 +24,72 @@ const optionalString = z
 
 const base64Key32 = z
   .string()
-  .min(1, "zorunlu")
+  .min(1, "required")
   .refine((v) => Buffer.from(v, "base64").length === 32, {
-    message: "base64 kodlu tam 32 byte olmalı (üretmek için: openssl rand -base64 32)",
+    message: "must be base64 encoded, exactly 32 bytes (generate: openssl rand -base64 32)",
   });
 
 const serverSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 
-  DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/, error: "postgres:// ile başlayan bir bağlantı adresi olmalı" }),
+  DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/, error: "must be a postgres:// connection URL" }),
   APP_URL: z.url({ protocol: /^https?$/ }).transform((v) => v.replace(/\/+$/, "")),
+  NEXT_PUBLIC_APP_NAME: z.string().min(1).default("Kodbox Campus"),
 
-  SESSION_SECRET: z.string().min(32, "en az 32 karakter olmalı"),
+  SESSION_SECRET: z.string().min(32, "must be at least 32 characters"),
   DATA_ENCRYPTION_KEY: base64Key32,
   BLIND_INDEX_KEY: base64Key32,
 
   RESEND_API_KEY: optionalString,
-  MAIL_FROM: z.string().min(3).default("Kodbox <no-reply@kodbox.local>"),
+  MAIL_FROM: z.string().min(3).default("Kodbox Campus <no-reply@kodbox.local>"),
 
   TURNSTILE_SITE_KEY: z.string().min(1),
   TURNSTILE_SECRET_KEY: z.string().min(1),
+  /** Skips the Turnstile server check. Refused in production. */
+  TURNSTILE_DEV_BYPASS: bool,
 
   GOOGLE_CLIENT_ID: optionalString,
   GOOGLE_CLIENT_SECRET: optionalString,
 
-  FEATURE_APPLE_LOGIN: bool,
-  APPLE_CLIENT_ID: optionalString,
-  APPLE_TEAM_ID: optionalString,
-  APPLE_KEY_ID: optionalString,
-  APPLE_PRIVATE_KEY: optionalString,
+  /** Web push (F6). Generate with `npx web-push generate-vapid-keys`. */
+  VAPID_PUBLIC_KEY: optionalString,
+  VAPID_PRIVATE_KEY: optionalString,
+  VAPID_SUBJECT: optionalString,
 
   CRON_SECRET: optionalString,
+
+  SEED_ADMIN_EMAIL: optionalString,
+  SEED_ADMIN_PASSWORD: optionalString,
 });
 
 export type ServerEnv = z.infer<typeof serverSchema>;
 
-let cached: ServerEnv | undefined;
-
-function load(): ServerEnv {
-  if (cached) return cached;
-  const parsed = serverSchema.safeParse(process.env);
+/** Validates a raw environment object. Exported for tests; the app uses `env`. */
+export function parseEnv(raw: Record<string, string | undefined>): ServerEnv {
+  const parsed = serverSchema.safeParse(raw);
   if (!parsed.success) {
-    const details = parsed.error.issues
-      .map((i) => `  • ${i.path.join(".") || "(kök)"}: ${i.message}`)
-      .join("\n");
-    throw new Error(
-      `Ortam değişkenleri geçersiz. .env.local dosyasını .env.example ile karşılaştırın:\n${details}`,
-    );
+    const details = parsed.error.issues.map((i) => `  - ${i.path.join(".") || "(root)"}: ${i.message}`).join("\n");
+    throw new Error(`Invalid environment variables. Compare your .env with .env.example:\n${details}`);
   }
   const value = parsed.data;
-  if (value.FEATURE_APPLE_LOGIN) {
-    const missing = (["APPLE_CLIENT_ID", "APPLE_TEAM_ID", "APPLE_KEY_ID", "APPLE_PRIVATE_KEY"] as const).filter(
-      (k) => !value[k],
-    );
-    if (missing.length > 0) {
-      throw new Error(`FEATURE_APPLE_LOGIN=true ama şu değişkenler eksik: ${missing.join(", ")}`);
-    }
+  if (value.NODE_ENV === "production" && value.TURNSTILE_DEV_BYPASS) {
+    throw new Error("TURNSTILE_DEV_BYPASS cannot be enabled in production.");
   }
-  cached = value;
+  if (value.VAPID_PUBLIC_KEY && !value.VAPID_PRIVATE_KEY) {
+    throw new Error("VAPID_PUBLIC_KEY is set but VAPID_PRIVATE_KEY is missing.");
+  }
   return value;
 }
 
+let cached: ServerEnv | undefined;
+
+function load(): ServerEnv {
+  cached ??= parseEnv(process.env);
+  return cached;
+}
+
 /**
- * Doğrulanmış ortam değişkenleri. Erişim anında tüm şema bir kez doğrulanır.
+ * Validated environment variables. The whole schema is validated once on first access.
  * @example env.DATABASE_URL
  */
 export const env: Readonly<ServerEnv> = new Proxy({} as ServerEnv, {
@@ -108,13 +109,11 @@ export const env: Readonly<ServerEnv> = new Proxy({} as ServerEnv, {
 
 export const isProduction = () => env.NODE_ENV === "production";
 
-/** Google ile giriş yapılandırılmış mı? (Buton görünürlüğü için) */
 export const isGoogleLoginEnabled = () => Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
 
-/** Apple ile giriş açık mı? (FEATURE_APPLE_LOGIN bayrağı + anahtarlar) */
-export const isAppleLoginEnabled = () => env.FEATURE_APPLE_LOGIN;
+export const isPushConfigured = () => Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY);
 
-/** Testlerde önbelleği sıfırlamak için. */
+/** For tests: clears the cached parse result. */
 export function __resetEnvCacheForTests() {
   cached = undefined;
 }

@@ -1,25 +1,25 @@
 /**
- * Maskeleme yardımcıları (saf fonksiyonlar; istemci ve sunucuda kullanılabilir).
+ * Masking helpers (pure; client and server safe).
  *
- * ÖNEMLİ: Maskelenmiş değer göstermek gereken yerde maskeleme SUNUCUDA yapılır ve istemciye
- * sadece maskeli değer gönderilir. Tam değeri client component'e prop olarak geçirmeyin.
+ * Masking must happen on the SERVER; never pass a full value to a client component when only
+ * the masked form should be visible.
  */
 
 /**
- * Öğrenci numarasını maskeler: ilk 2 ve son 2 karakter açık, arası `*`.
- * @example maskStudentNo("260000009") // "26*****79"
- * 4 veya daha kısa değerler tamamen maskelenir: "1234" → "****".
+ * Masks a student number: first 2 and last 1 characters stay visible.
+ * @example maskStudentNo("260000009") // "26******9"
+ * Values of 4 characters or fewer are fully masked.
  */
 export function maskStudentNo(value: string): string {
   const v = value.trim();
   if (v.length <= 4) return "*".repeat(v.length);
-  return `${v.slice(0, 2)}${"*".repeat(v.length - 4)}${v.slice(-2)}`;
+  return `${v.slice(0, 2)}${"*".repeat(v.length - 3)}${v.slice(-1)}`;
 }
 
 /**
- * E-posta adresini maskeler. Yerel kısım rakamlardan oluşuyorsa (öğrenci no) `maskStudentNo`
- * kuralı, aksi halde ilk 2 karakter + `***` uygulanır. Domain açık kalır.
- * @example maskEmail("260000009@ogr.mku.edu.tr") // "26*****79@ogr.mku.edu.tr"
+ * Masks an email. Numeric local parts (student numbers) use `maskStudentNo`; others keep the
+ * first 2 characters. The domain stays visible.
+ * @example maskEmail("260000009@ogr.mku.edu.tr") // "26******9@ogr.mku.edu.tr"
  * @example maskEmail("ahmet.yilmaz@mku.edu.tr")  // "ah***@mku.edu.tr"
  */
 export function maskEmail(email: string): string {

@@ -1,32 +1,30 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
+import Link from "next/link";
 
-import { AuthHeader } from "@/components/auth/auth-layout";
-import { ForgotPasswordForm } from "@/components/auth/forgot-password-form";
-import { FormMessage } from "@/components/form-field";
-import { redirectIfSignedIn } from "@/lib/server/auth";
-import { getDefaultSchool, toSchoolIdentity } from "@/lib/server/schools";
-import { getTurnstileSiteKey } from "@/lib/server/turnstile";
-
-import { AuthFormSkeleton } from "../form-skeleton";
+import { AudienceEmailField } from "@/components/auth/audience-email-field";
+import { AuthCard } from "@/components/auth/auth-card";
+import { PlaceholderForm } from "@/components/auth/placeholder-form";
+import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = { title: "Şifremi unuttum" };
 
-/** Şifre sıfırlama isteği (PLAN.md §2.3). */
 export default function ForgotPasswordPage() {
   return (
-    <>
-      <AuthHeader title="Şifremi unuttum" description="Okul mailine tek kullanımlık bir sıfırlama linki gönderelim." />
-      <Suspense fallback={<AuthFormSkeleton fields={1} />}>
-        <ForgotPasswordContent />
-      </Suspense>
-    </>
+    <AuthCard title="Şifremi unuttum" description="Okul mailinize bir sıfırlama linki göndereceğiz.">
+      <div className="space-y-4">
+        <PlaceholderForm className="space-y-4">
+          <AudienceEmailField />
+          <Button type="submit" size="lg" className="h-11 w-full text-sm">
+            Sıfırlama linki gönder
+          </Button>
+        </PlaceholderForm>
+        <Link
+          href="/giris"
+          className="inline-flex min-h-11 items-center text-sm text-primary underline-offset-4 hover:underline"
+        >
+          Girişe dön
+        </Link>
+      </div>
+    </AuthCard>
   );
-}
-
-async function ForgotPasswordContent() {
-  await redirectIfSignedIn();
-  const school = await getDefaultSchool();
-  if (!school) return <FormMessage>Sistemde tanımlı okul yok.</FormMessage>;
-  return <ForgotPasswordForm school={toSchoolIdentity(school)} turnstileSiteKey={getTurnstileSiteKey()} />;
 }

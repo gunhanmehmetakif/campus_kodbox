@@ -1,13 +1,18 @@
-import { LibraryIcon } from "lucide-react";
 import type { Metadata } from "next";
+import { BookOpen } from "lucide-react";
 
-import { SectionPlaceholder } from "@/components/section-placeholder";
-import { requireRole } from "@/lib/server/auth";
+import { PlaceholderPage } from "@/components/common/placeholder-page";
 
 export const metadata: Metadata = { title: "Dersler" };
 
-/** Dersler — F2. */
-export default async function AdminCoursesPage() {
-  await requireRole("admin");
-  return <SectionPlaceholder title="Dersler" description="Tüm dersler, dönem filtresi ve toplu arşivleme." phase="F2" icon={LibraryIcon} />;
+export default function AdminCoursesPage() {
+  return (
+    <PlaceholderPage
+      title="Dersler"
+      description="Dönem filtresi ve toplu arşivleme."
+      emptyTitle="Henüz ders yok"
+      emptyDescription="Eğitmenler ders açtığında burada listelenir."
+      icon={BookOpen}
+    />
+  );
 }

@@ -9,7 +9,7 @@ import { decideRateLimit, peekRateLimit } from "@/lib/rate-limit-core";
 export { formatRetryAfter } from "@/lib/rate-limit-core";
 
 /**
- * DB tabanlı sabit pencere rate limit (PLAN.md §2.4).
+ * DB backed fixed-window rate limit (docs/PRD.md section 2.5).
  *
  * @example
  *   const rl = await consume(rateLimitKey("auth-ip", ip), RATE_LIMITS.authRequestPerIp);
@@ -19,33 +19,28 @@ export { formatRetryAfter } from "@/lib/rate-limit-core";
 export type RateLimitPolicy = { limit: number; windowSec: number };
 export type RateLimitResult = { ok: boolean; remaining: number; retryAfter: number };
 
-/** PLAN.md'deki politikalar. Yeni bir sınır gerekiyorsa buraya ekleyin. */
 export const RATE_LIMITS = {
-  /** Aynı kimliğe (öğrenci no / personel maili) en fazla 3 mail / saat. */
+  /** At most 3 mails per hour for the same identity (student no / staff email). */
   mailPerIdentity: { limit: 3, windowSec: 60 * 60 },
-  /** Aynı IP'den en fazla 10 kayıt veya sıfırlama isteği / saat. */
+  /** At most 10 register or reset requests per hour from the same IP. */
   authRequestPerIp: { limit: 10, windowSec: 60 * 60 },
-  /** Aynı hesaba 5 başarısız giriş → pencere sonuna kadar (en fazla 15 dk) bekleme. */
+  /** 5 failed logins on the same account lock it for the rest of a 15 minute window. */
   loginFailures: { limit: 5, windowSec: 15 * 60 },
-  /** Aynı IP'den giriş denemesi (hesap tarama / kaba kuvvete karşı). */
+  /** Login attempts per IP (account scanning / brute force). */
   loginPerIp: { limit: 30, windowSec: 15 * 60 },
-  /** "Tekrar gönder" butonu: 60 saniyede bir. */
+  /** "Resend" button: once per 60 seconds. */
   resendCooldown: { limit: 1, windowSec: 60 },
 } as const satisfies Record<string, RateLimitPolicy>;
 
 /**
- * Anahtar üretir; parçalar ":" ile birleşir. KİŞİSEL VERİ YAZMAYIN: mail/numara yerine
- * blindIndex(...) kullanın. IP adresi geçici sayaç anahtarında kabul edilebilir.
- * @example rateLimitKey("login-fail", emailHash) // "login-fail:ab12…"
+ * Builds a key by joining parts with ":". Do not put personal data in it: use blindIndex(...)
+ * instead of emails or numbers. An IP address is acceptable in a short-lived counter key.
  */
 export function rateLimitKey(scope: string, ...parts: string[]): string {
   return [scope, ...parts].join(":");
 }
 
-/**
- * Bir isteği sayar ve karar döner. Satır kilidiyle (SELECT … FOR UPDATE) eşzamanlı
- * isteklerde de doğru sayar.
- */
+/** Counts one request and decides. Uses SELECT ... FOR UPDATE so concurrent requests count correctly. */
 export async function consume(key: string, policy: RateLimitPolicy): Promise<RateLimitResult>;
 export async function consume(key: string, limit: number, windowSec: number): Promise<RateLimitResult>;
 export async function consume(
@@ -84,7 +79,7 @@ export async function consume(
   });
 }
 
-/** Saymadan kontrol eder (ör. şifre doğrulamadan önce "hesap kilitli mi?"). */
+/** Checks without counting (e.g. "is the account locked?" before verifying the password). */
 export async function peek(
   key: string,
   policy: RateLimitPolicy,
@@ -98,12 +93,12 @@ export async function peek(
   );
 }
 
-/** Sayacı sıfırlar (ör. başarılı girişten sonra başarısız giriş sayacı). */
+/** Resets a counter (e.g. failed-login counter after a successful login). */
 export async function resetRateLimit(key: string): Promise<void> {
   await db.delete(rateLimits).where(eq(rateLimits.key, key));
 }
 
-/** Süresi dolmuş sayaçları siler (F6 cron'u çağırır). Silinen satır sayısını döner. */
+/** Purges expired counters (F6 cron). Returns the number of deleted rows. */
 export async function purgeExpiredRateLimits(): Promise<number> {
   const rows = await db
     .delete(rateLimits)

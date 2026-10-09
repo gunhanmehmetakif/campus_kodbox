@@ -1,14 +1,15 @@
 /**
- * Kodbox veritabanı şeması (PLAN.md §8'in tam uygulaması).
+ * Kodbox Campus database schema (docs/PRD.md section 10).
  *
- * Kurallar
- * - Tüm PK'ler uuid (gen_random_uuid()); `sessions.id` hariç (token'ın SHA-256 hash'i).
- * - Tüm zaman damgaları `timestamptz` (UTC saklanır, gösterimde Europe/Istanbul).
- * - Kişisel veriler (e-posta, öğrenci no) ŞİFRELİ (`*_enc`, AES-256-GCM) + aranabilir
- *   blind index (`*_hash`, HMAC-SHA256) olarak tutulur. Düz metin ASLA yazılmaz.
- *   Yazma/okuma için: src/lib/server/crypto.ts → encrypt / decrypt / blindIndex.
- * - Şema F0'da donduruldu. Sonraki fazlar şemayı değiştirmemeli; zorunlu bir değişiklik
- *   gerekirse yeni bir migration ile (npm run db:generate) yapılır, mevcut migration düzenlenmez.
+ * Conventions
+ * - UUID primary keys (gen_random_uuid()); `sessions.id` is the SHA-256 of the cookie token.
+ * - All timestamps are `timestamptz` (stored UTC, shown as Europe/Istanbul).
+ * - Personal data (email, student no, roster names) is stored encrypted (`*_enc`, AES-256-GCM)
+ *   plus a searchable blind index (`*_hash`, HMAC-SHA256). Never write plaintext.
+ *   See src/lib/server/crypto.ts.
+ * - Students have no display name (KVKK); `users.display_name` is staff only.
+ * - Schema changes after F0 go through a new migration (npm run db:generate); never edit an
+ *   existing migration.
  */
 import { relations, sql } from "drizzle-orm";
 import {
@@ -27,8 +28,6 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-/* ────────────────────────────── Ortak yardımcılar ────────────────────────────── */
-
 const id = () => uuid("id").primaryKey().defaultRandom();
 const tstz = (name: string) => timestamp(name, { withTimezone: true, mode: "date" });
 const createdAt = () => tstz("created_at").notNull().defaultNow();
@@ -38,22 +37,19 @@ const updatedAt = () =>
     .defaultNow()
     .$onUpdate(() => new Date());
 
-/** Materyal / ödev kaynak linki. `posts.links` ve `assignments.links` jsonb dizisinin elemanı. */
+/** Link attached to a post or assignment (`links` jsonb array element). */
 export type LinkItem = { title: string; url: string };
 
-/* ──────────────────────────────────── Enum'lar ─────────────────────────────────── */
+/* ───────────────────────────────── Enums ───────────────────────────────── */
 
 export const userRole = pgEnum("user_role", ["admin", "instructor", "student"]);
 export const userStatus = pgEnum("user_status", ["pending", "active", "disabled"]);
 export const themePreference = pgEnum("theme_preference", ["system", "light", "dark"]);
+/** Apple is not offered in v1 but the column stays provider-generic. */
 export const oauthProvider = pgEnum("oauth_provider", ["google", "apple"]);
 export const emailTokenPurpose = pgEnum("email_token_purpose", ["verify", "reset"]);
 export const postType = pgEnum("post_type", ["announcement", "material"]);
-/**
- * İçerik durumu (duyuru, materyal, ödev).
- * - draft: sadece eğitmen görür.
- * - published: `publish_at <= now()` ise öğrenci görür; `publish_at > now()` ise "zamanlanmış".
- */
+/** Content state. There is no scheduled publishing in v1: draft or published. */
 export const contentStatus = pgEnum("content_status", ["draft", "published"]);
 export const submissionType = pgEnum("submission_type", ["link", "none"]);
 export const latePenaltyType = pgEnum("late_penalty_type", ["none", "points", "percent"]);
@@ -68,20 +64,20 @@ export type ContentStatus = (typeof contentStatus.enumValues)[number];
 export type SubmissionType = (typeof submissionType.enumValues)[number];
 export type LatePenaltyType = (typeof latePenaltyType.enumValues)[number];
 
-/* ──────────────────────────────────── Okullar ─────────────────────────────────── */
+/* ──────────────────────────────── Schools ──────────────────────────────── */
 
 export const schools = pgTable(
   "schools",
   {
     id: id(),
     name: text("name").notNull(),
-    /** Kısa kod (örn. "mku"); URL ve seed için. */
+    /** Short code (e.g. "mku"). */
     slug: text("slug").notNull(),
-    /** Öğrenci mail domain'i (örn. "ogr.mku.edu.tr"). Öğrenci maili = `${no}@${domain}`. */
+    /** Student mail domain, e.g. "ogr.mku.edu.tr". Student email = `${no}@${domain}`. */
     studentEmailDomain: text("student_email_domain").notNull(),
-    /** Personel (eğitmen/admin) mail domain'i (örn. "mku.edu.tr"). */
+    /** Staff (instructor/admin) mail domain, e.g. "mku.edu.tr". */
     staffEmailDomain: text("staff_email_domain").notNull(),
-    /** Öğrenci numarası format regex'i (örn. "^\d{6,12}$"). */
+    /** Student number format regex, e.g. "^\d{6,12}$". */
     studentNoRegex: text("student_no_regex").notNull().default("^\\d{6,12}$"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -89,11 +85,15 @@ export const schools = pgTable(
   (t) => [
     uniqueIndex("schools_slug_uq").on(t.slug),
     uniqueIndex("schools_student_email_domain_uq").on(t.studentEmailDomain),
-    check("schools_domains_lowercase_chk", sql`${t.studentEmailDomain} = lower(${t.studentEmailDomain}) AND ${t.staffEmailDomain} = lower(${t.staffEmailDomain})`),
+    uniqueIndex("schools_staff_email_domain_uq").on(t.staffEmailDomain),
+    check(
+      "schools_domains_lowercase_chk",
+      sql`${t.studentEmailDomain} = lower(${t.studentEmailDomain}) AND ${t.staffEmailDomain} = lower(${t.staffEmailDomain})`,
+    ),
   ],
 );
 
-/* ─────────────────────────────────── Kullanıcılar ────────────────────────────────── */
+/* ──────────────────────────────── Users ──────────────────────────────── */
 
 export const users = pgTable(
   "users",
@@ -104,29 +104,27 @@ export const users = pgTable(
       .notNull()
       .references(() => schools.id, { onDelete: "restrict" }),
 
-    /** Okul maili, şifreli (giriş kimliği; herkes için). */
+    /** School email, encrypted (login identity for everyone). */
     emailEnc: text("email_enc").notNull(),
-    /** blindIndex(email) — giriş ve tekillik için. */
+    /** blindIndex(email): login lookup and uniqueness. */
     emailHash: text("email_hash").notNull(),
 
-    /** Sadece öğrenci: okul numarası, şifreli. */
+    /** Students only: school number, encrypted. */
     studentNoEnc: text("student_no_enc"),
-    /** Sadece öğrenci: blindIndex(studentNo) — course_roster eşleşmesi için. */
+    /** Students only: blindIndex(studentNo), matches course_roster. */
     studentNoHash: text("student_no_hash"),
 
-    /** Sadece eğitmen/admin (öğrencide isim TUTULMAZ — KVKK). */
+    /** Staff only (instructor/admin). Students have no name (KVKK). */
     displayName: text("display_name"),
 
-    /** argon2id hash. null = henüz şifre belirlenmemiş (yalnızca status=pending'de anlamlı). */
+    /** argon2id hash. Null only while status = pending. */
     passwordHash: text("password_hash"),
     status: userStatus("status").notNull().default("pending"),
-    /** Admin'in verdiği geçici şifreyle ilk girişte true; /sifre-degistir'e zorlanır. */
+    /** True after an admin-issued temporary password; forces /sifre-degistir. */
     mustChangePassword: boolean("must_change_password").notNull().default(false),
     theme: themePreference("theme").notNull().default("system"),
 
-    /** KVKK aydınlatma metni onay zamanı (öğrenci kaydında zorunlu). */
     kvkkAcceptedAt: tstz("kvkk_accepted_at"),
-    /** Mail sahipliği doğrulandığı an. */
     emailVerifiedAt: tstz("email_verified_at"),
     passwordChangedAt: tstz("password_changed_at"),
     lastLoginAt: tstz("last_login_at"),
@@ -142,14 +140,14 @@ export const users = pgTable(
     index("users_school_id_idx").on(t.schoolId),
     check(
       "users_student_no_role_chk",
-      sql`(${t.role} = 'student' AND ${t.studentNoHash} IS NOT NULL AND ${t.studentNoEnc} IS NOT NULL)
+      sql`(${t.role} = 'student' AND ${t.studentNoHash} IS NOT NULL AND ${t.studentNoEnc} IS NOT NULL AND ${t.displayName} IS NULL)
        OR (${t.role} <> 'student' AND ${t.studentNoHash} IS NULL AND ${t.studentNoEnc} IS NULL)`,
     ),
     check("users_active_has_password_chk", sql`${t.status} <> 'active' OR ${t.passwordHash} IS NOT NULL`),
   ],
 );
 
-/* ─────────────────────────────── OAuth bağlantıları ─────────────────────────────── */
+/* ───────────────────────────── OAuth accounts ───────────────────────────── */
 
 export const oauthAccounts = pgTable(
   "oauth_accounts",
@@ -159,9 +157,9 @@ export const oauthAccounts = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     provider: oauthProvider("provider").notNull(),
-    /** Sağlayıcının kullanıcı kimliği (Google `sub`, Apple `sub`). */
+    /** Provider's user id (Google `sub`). */
     providerUserId: text("provider_user_id").notNull(),
-    /** Sağlayıcıdaki e-posta (ayarlarda "Bağlı: …" göstermek için), şifreli. */
+    /** Provider email shown in settings ("Bağlı: …"), encrypted. */
     providerEmailEnc: text("provider_email_enc"),
     createdAt: createdAt(),
   },
@@ -171,41 +169,42 @@ export const oauthAccounts = pgTable(
   ],
 );
 
-/* ──────────────────────────────────── Oturumlar ─────────────────────────────────── */
+/* ──────────────────────────────── Sessions ──────────────────────────────── */
 
 export const sessions = pgTable(
   "sessions",
   {
-    /** SHA-256(token) hex. Token'ın kendisi sadece kullanıcının çerezinde durur. */
+    /** SHA-256(token) hex. The raw token only lives in the user's cookie. */
     id: text("id").primaryKey(),
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    /** "Remember me": 90 day sliding expiry. Otherwise a short sliding window + session cookie. */
+    remember: boolean("remember").notNull().default(true),
     expiresAt: tstz("expires_at").notNull(),
     createdAt: createdAt(),
-    /** Kayan süre uzatıldığında güncellenir (aktif oturum listesi için). */
     lastSeenAt: tstz("last_seen_at").notNull().defaultNow(),
-    /** Kısaltılmış User-Agent (oturum listesinde "Chrome · Windows" gibi göstermek için). */
+    /** Truncated User-Agent for the session list. */
     userAgent: text("user_agent"),
   },
   (t) => [index("sessions_user_id_idx").on(t.userId), index("sessions_expires_at_idx").on(t.expiresAt)],
 );
 
-/* ─────────────────────────── Mail token'ları (doğrulama/sıfırlama) ─────────────────────────── */
+/* ──────────────────────────── Email tokens (verify / reset) ──────────────────────────── */
 
 export const emailTokens = pgTable(
   "email_tokens",
   {
     id: id(),
-    /** Sıfırlama (reset) için dolu; kayıt doğrulamada (verify) kullanıcı henüz yoksa null. */
+    /** Set for reset; null for verify when the user does not exist yet. */
     userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
     schoolId: uuid("school_id")
       .notNull()
       .references(() => schools.id, { onDelete: "cascade" }),
-    /** blindIndex(okul maili) — token'ın hangi kimlik için üretildiği (rate limit + tekillik). */
+    /** blindIndex(school email): which identity the token was issued for. */
     loginIdHash: text("login_id_hash").notNull(),
     purpose: emailTokenPurpose("purpose").notNull(),
-    /** SHA-256(token) hex. Token'ın kendisi sadece mail linkinde durur. */
+    /** SHA-256(token) hex. The raw token only lives in the mail link. */
     tokenHash: text("token_hash").notNull(),
     expiresAt: tstz("expires_at").notNull(),
     usedAt: tstz("used_at"),
@@ -218,11 +217,11 @@ export const emailTokens = pgTable(
   ],
 );
 
-/* ───────────────────────────────── Rate limit sayaçları ───────────────────────────────── */
+/* ─────────────────────────────── Rate limits ─────────────────────────────── */
 
 /**
- * Sabit pencere sayaçları. Anahtar örnekleri: "mail:student:{hash}", "register:ip:{ip}",
- * "login-fail:{emailHash}". Mantık: src/lib/server/rate-limit.ts
+ * Fixed-window counters, e.g. "mail:{hash}", "register:ip:{ip}", "login-fail:{hash}".
+ * Logic: src/lib/server/rate-limit.ts
  */
 export const rateLimits = pgTable(
   "rate_limits",
@@ -230,13 +229,36 @@ export const rateLimits = pgTable(
     key: text("key").primaryKey(),
     windowStart: tstz("window_start").notNull(),
     count: integer("count").notNull().default(0),
-    /** windowStart + pencere süresi; süresi dolan satırlar periyodik temizlenir. */
+    /** windowStart + window length; expired rows are purged periodically. */
     expiresAt: tstz("expires_at").notNull(),
   },
   (t) => [index("rate_limits_expires_at_idx").on(t.expiresAt)],
 );
 
-/* ──────────────────────────────────── Dönemler ─────────────────────────────────── */
+/* ───────────────────────────── Push subscriptions ───────────────────────────── */
+
+export const pushSubscriptions = pgTable(
+  "push_subscriptions",
+  {
+    id: id(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Push service URL, unique per browser/device. */
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    userAgent: text("user_agent"),
+    createdAt: createdAt(),
+    lastUsedAt: tstz("last_used_at"),
+  },
+  (t) => [
+    uniqueIndex("push_subscriptions_endpoint_uq").on(t.endpoint),
+    index("push_subscriptions_user_id_idx").on(t.userId),
+  ],
+);
+
+/* ───────────────────────────────── Terms ───────────────────────────────── */
 
 export const terms = pgTable(
   "terms",
@@ -245,7 +267,7 @@ export const terms = pgTable(
     schoolId: uuid("school_id")
       .notNull()
       .references(() => schools.id, { onDelete: "cascade" }),
-    /** Örn. "2026-2027 Güz". */
+    /** e.g. "2026-2027 Güz". */
     name: text("name").notNull(),
     startsOn: date("starts_on", { mode: "string" }),
     endsOn: date("ends_on", { mode: "string" }),
@@ -255,13 +277,13 @@ export const terms = pgTable(
   },
   (t) => [
     uniqueIndex("terms_school_name_uq").on(t.schoolId, t.name),
-    /** Okul başına en fazla bir aktif dönem. */
+    /** At most one active term per school. */
     uniqueIndex("terms_one_active_per_school_uq").on(t.schoolId).where(sql`${t.isActive}`),
     check("terms_dates_chk", sql`${t.startsOn} IS NULL OR ${t.endsOn} IS NULL OR ${t.endsOn} >= ${t.startsOn}`),
   ],
 );
 
-/* ──────────────────────────────────── Dersler ─────────────────────────────────── */
+/* ──────────────────────────────── Courses ──────────────────────────────── */
 
 export const courses = pgTable(
   "courses",
@@ -273,11 +295,11 @@ export const courses = pgTable(
     termId: uuid("term_id")
       .notNull()
       .references(() => terms.id, { onDelete: "restrict" }),
-    /** Ders kodu, büyük harf, boşluksuz (örn. "BİL101"). Gösterimde mono rozet. */
+    /** Upper case, no spaces (e.g. "BİL101"). */
     code: text("code").notNull(),
     name: text("name").notNull(),
     description: text("description"),
-    /** Dolu ise ders arşivlenmiştir (salt okunur, "Geçmiş dersler"). */
+    /** Set when archived (read-only, listed under past courses). */
     archivedAt: tstz("archived_at"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -289,11 +311,11 @@ export const courses = pgTable(
   ],
 );
 
-/* ──────────────────────────────── Ders öğrenci listesi ──────────────────────────────── */
+/* ───────────────────────────── Course roster ───────────────────────────── */
 
 /**
- * Eğitmenin eklediği öğrenci numaraları. Numara, öğrenci kayıt olmadan önce de burada durur;
- * öğrenci kayıt olunca `user_id` bağlanır (eşleşme `student_no_hash` ile).
+ * Student numbers an instructor added to a course. A number can be here before the student
+ * registers; `user_id` is linked at registration (matched by `student_no_hash`).
  */
 export const courseRoster = pgTable(
   "course_roster",
@@ -304,6 +326,8 @@ export const courseRoster = pgTable(
       .references(() => courses.id, { onDelete: "cascade" }),
     studentNoHash: text("student_no_hash").notNull(),
     studentNoEnc: text("student_no_enc").notNull(),
+    /** Optional name pasted by the instructor, encrypted. Visible only to the course instructor. */
+    displayNameEnc: text("display_name_enc"),
     userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
     addedById: uuid("added_by_id").references(() => users.id, { onDelete: "set null" }),
     addedAt: tstz("added_at").notNull().defaultNow(),
@@ -315,7 +339,7 @@ export const courseRoster = pgTable(
   ],
 );
 
-/* ───────────────────────────── Duyurular ve materyaller ───────────────────────────── */
+/* ─────────────────────────── Announcements & materials ─────────────────────────── */
 
 export const posts = pgTable(
   "posts",
@@ -330,23 +354,18 @@ export const posts = pgTable(
     bodyMd: text("body_md").notNull().default(""),
     links: jsonb("links").$type<LinkItem[]>().notNull().default([]),
     status: contentStatus("status").notNull().default("draft"),
-    /** Yayın anı. Taslakta null olabilir; published iken zorunlu (gelecekteyse zamanlanmış). */
-    publishAt: tstz("publish_at"),
-    /** Yayın bildirimi gönderildiği an (F6 cron'u tekrar göndermesin diye). */
-    notifiedAt: tstz("notified_at"),
+    /** Set when published (draft: null). */
+    publishedAt: tstz("published_at"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
-    index("posts_course_feed_idx").on(t.courseId, t.status, t.publishAt.desc()),
-    index("posts_pending_publish_idx")
-      .on(t.publishAt)
-      .where(sql`${t.status} = 'published' AND ${t.notifiedAt} IS NULL`),
-    check("posts_published_has_date_chk", sql`${t.status} <> 'published' OR ${t.publishAt} IS NOT NULL`),
+    index("posts_course_feed_idx").on(t.courseId, t.status, t.publishedAt.desc()),
+    check("posts_published_has_date_chk", sql`${t.status} <> 'published' OR ${t.publishedAt} IS NOT NULL`),
   ],
 );
 
-/* ──────────────────────────────────── Ödevler ─────────────────────────────────── */
+/* ─────────────────────────────── Assignments ─────────────────────────────── */
 
 export const assignments = pgTable(
   "assignments",
@@ -360,27 +379,26 @@ export const assignments = pgTable(
     bodyMd: text("body_md").notNull().default(""),
     links: jsonb("links").$type<LinkItem[]>().notNull().default([]),
 
-    /** link: öğrenci link teslim eder · none: teslim gerektirmeyen (bilgilendirme). */
+    /** link: students submit a link. none: informational, no submission. */
     submissionType: submissionType("submission_type").notNull().default("link"),
-    /** false: sadece drive.google.com / docs.google.com kabul edilir. */
+    /** false: only drive.google.com / docs.google.com links are accepted. */
     allowAnyLink: boolean("allow_any_link").notNull().default(false),
 
-    /** null = süresiz. */
+    /** Null = no deadline. */
     dueAt: tstz("due_at"),
     lateAllowed: boolean("late_allowed").notNull().default(false),
-    /** Geç teslim son kabul anı; null + lateAllowed = süresiz geç teslim. */
+    /** Last accepted late submission time; null with lateAllowed = open ended. */
     lateUntil: tstz("late_until"),
     latePenaltyType: latePenaltyType("late_penalty_type").notNull().default("none"),
-    /** points: düşülecek puan · percent: yüzde (0–100). Ceza otomatik uygulanmaz, öneridir. */
+    /** points: points deducted. percent: 0-100. Only a suggestion, never applied automatically. */
     latePenaltyValue: numeric("late_penalty_value", { precision: 6, scale: 2, mode: "number" }),
 
-    /** null = puanlama kapalı. */
+    /** Null = grading off. */
     maxScore: numeric("max_score", { precision: 6, scale: 2, mode: "number" }),
 
     status: contentStatus("status").notNull().default("draft"),
-    publishAt: tstz("publish_at"),
-    notifiedAt: tstz("notified_at"),
-    /** "Son tarihe 24 saat kaldı" bildirimi gönderildiği an (F6). Tarih değişirse null'lanır. */
+    publishedAt: tstz("published_at"),
+    /** When the "24 hours left" reminder was sent (F6). Reset when the due date changes. */
     dueReminderSentAt: tstz("due_reminder_sent_at"),
 
     createdAt: createdAt(),
@@ -388,11 +406,11 @@ export const assignments = pgTable(
   },
   (t) => [
     index("assignments_course_idx").on(t.courseId, t.status, t.dueAt),
-    index("assignments_due_at_idx").on(t.dueAt).where(sql`${t.status} = 'published'`),
-    index("assignments_pending_publish_idx")
-      .on(t.publishAt)
-      .where(sql`${t.status} = 'published' AND ${t.notifiedAt} IS NULL`),
-    check("assignments_published_has_date_chk", sql`${t.status} <> 'published' OR ${t.publishAt} IS NOT NULL`),
+    index("assignments_due_at_idx").on(t.dueAt),
+    index("assignments_published_due_idx")
+      .on(t.dueAt)
+      .where(sql`${t.status} = 'published' AND ${t.dueAt} IS NOT NULL`),
+    check("assignments_published_has_date_chk", sql`${t.status} <> 'published' OR ${t.publishedAt} IS NOT NULL`),
     check(
       "assignments_late_window_chk",
       sql`${t.lateUntil} IS NULL OR (${t.dueAt} IS NOT NULL AND ${t.lateAllowed} AND ${t.lateUntil} > ${t.dueAt})`,
@@ -408,7 +426,7 @@ export const assignments = pgTable(
   ],
 );
 
-/* ──────────────────────────────────── Teslimler ─────────────────────────────────── */
+/* ─────────────────────────────── Submissions ─────────────────────────────── */
 
 export const submissions = pgTable(
   "submissions",
@@ -421,7 +439,7 @@ export const submissions = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     url: text("url").notNull(),
-    /** Son (güncel) teslim zamanı. İlk teslim submission_history'nin en eskisidir. */
+    /** Latest submission time; the first one is the oldest submission_history row. */
     submittedAt: tstz("submitted_at").notNull().defaultNow(),
     isLate: boolean("is_late").notNull().default(false),
 
@@ -429,7 +447,7 @@ export const submissions = pgTable(
     feedback: text("feedback"),
     gradedAt: tstz("graded_at"),
     gradedById: uuid("graded_by_id").references(() => users.id, { onDelete: "set null" }),
-    /** Dolu ise puan + geri bildirim öğrenciye görünür. */
+    /** When set, score and feedback are visible to the student. */
     scorePublishedAt: tstz("score_published_at"),
 
     createdAt: createdAt(),
@@ -456,7 +474,7 @@ export const submissionHistory = pgTable(
   (t) => [index("submission_history_submission_idx").on(t.submissionId, t.submittedAt.desc())],
 );
 
-/* ──────────────────────────────────── Bildirimler ─────────────────────────────────── */
+/* ─────────────────────────────── Notifications ─────────────────────────────── */
 
 export const notifications = pgTable(
   "notifications",
@@ -465,7 +483,7 @@ export const notifications = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    /** Bildirim türü (bkz. src/lib/server/notifications.ts → NotificationType). */
+    /** Notification type (see src/lib/server/notifications.ts). */
     type: text("type").notNull(),
     payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
     readAt: tstz("read_at"),
@@ -477,19 +495,19 @@ export const notifications = pgTable(
   ],
 );
 
-/* ──────────────────────────────────── Denetim kaydı ─────────────────────────────────── */
+/* ─────────────────────────────── Audit log ─────────────────────────────── */
 
 export const auditLogs = pgTable(
   "audit_logs",
   {
     id: id(),
-    /** İşlemi yapan; sistem işlerinde (cron, seed) null. */
+    /** Null for system jobs (cron, seed). */
     actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
-    /** Örn. "instructor.create", "course.archive" (bkz. src/lib/server/audit.ts → AuditAction). */
+    /** e.g. "instructor.create" (see src/lib/server/audit.ts). */
     action: text("action").notNull(),
     targetType: text("target_type"),
     targetId: text("target_id"),
-    /** Ek bağlam. Kişisel veri (düz mail/numara) YAZILMAZ; maskeli veya id kullanılır. */
+    /** Extra context. No plaintext personal data: use ids or masked values. */
     metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
     createdAt: createdAt(),
   },
@@ -500,7 +518,7 @@ export const auditLogs = pgTable(
   ],
 );
 
-/* ──────────────────────────────────── İlişkiler ─────────────────────────────────── */
+/* ─────────────────────────────── Relations ─────────────────────────────── */
 
 export const schoolsRelations = relations(schools, ({ many }) => ({
   users: many(users),
@@ -511,6 +529,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   school: one(schools, { fields: [users.schoolId], references: [schools.id] }),
   oauthAccounts: many(oauthAccounts),
   sessions: many(sessions),
+  pushSubscriptions: many(pushSubscriptions),
   coursesTaught: many(courses),
   submissions: many(submissions),
   notifications: many(notifications),
@@ -522,6 +541,10 @@ export const oauthAccountsRelations = relations(oauthAccounts, ({ one }) => ({
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
   user: one(users, { fields: [sessions.userId], references: [users.id] }),
+}));
+
+export const pushSubscriptionsRelations = relations(pushSubscriptions, ({ one }) => ({
+  user: one(users, { fields: [pushSubscriptions.userId], references: [users.id] }),
 }));
 
 export const emailTokensRelations = relations(emailTokens, ({ one }) => ({
@@ -576,7 +599,7 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
   actor: one(users, { fields: [auditLogs.actorId], references: [users.id] }),
 }));
 
-/* ──────────────────────────────────── Satır tipleri ─────────────────────────────────── */
+/* ─────────────────────────────── Row types ─────────────────────────────── */
 
 export type School = typeof schools.$inferSelect;
 export type User = typeof users.$inferSelect;
@@ -584,6 +607,7 @@ export type NewUser = typeof users.$inferInsert;
 export type OAuthAccount = typeof oauthAccounts.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type EmailToken = typeof emailTokens.$inferSelect;
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type Term = typeof terms.$inferSelect;
 export type Course = typeof courses.$inferSelect;
 export type CourseRosterEntry = typeof courseRoster.$inferSelect;

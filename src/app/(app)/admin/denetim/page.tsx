@@ -1,13 +1,18 @@
-import { ScrollTextIcon } from "lucide-react";
 import type { Metadata } from "next";
+import { History } from "lucide-react";
 
-import { SectionPlaceholder } from "@/components/section-placeholder";
-import { requireRole } from "@/lib/server/auth";
+import { PlaceholderPage } from "@/components/common/placeholder-page";
 
 export const metadata: Metadata = { title: "Denetim kaydı" };
 
-/** Denetim kaydı — F2. */
-export default async function AdminAuditPage() {
-  await requireRole("admin");
-  return <SectionPlaceholder title="Denetim kaydı" description="Kritik işlemlerin kaydı (kim, ne zaman, ne yaptı)." phase="F2" icon={ScrollTextIcon} />;
+export default function AdminAuditPage() {
+  return (
+    <PlaceholderPage
+      title="Denetim kaydı"
+      description="Yönetici ve sistem işlemlerinin kaydı."
+      emptyTitle="Henüz kayıt yok"
+      emptyDescription="Yapılan işlemler burada izlenir."
+      icon={History}
+    />
+  );
 }

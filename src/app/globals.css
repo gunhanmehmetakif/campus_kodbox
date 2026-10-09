@@ -2,339 +2,294 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-/*
- * Kodbox tasarım token'ları — kaynak: DESIGN.md
- * ------------------------------------------------
- * Bu dosya, uygulamadaki TÜM renklerin tek kaynağıdır. Bileşenlerde hex/rgb yazılmaz;
- * Tailwind sınıfları (bg-surface, text-ink-soft, border-line, text-laurel …) veya
- * CSS değişkenleri (var(--laurel)) kullanılır.
- *
- * Tema: varsayılan olarak `prefers-color-scheme` izlenir. Kullanıcı tema anahtarıyla
- * <html data-theme="light|dark"> ayarlarsa sistem tercihi ezilir.
- */
-
-/* `dark:` varyantı: açık data-theme="dark" VEYA (data-theme="light" değilken) sistem karanlık */
+/* Dark mode: system preference unless [data-theme="light"] forces light; [data-theme="dark"] forces dark. */
 @custom-variant dark {
   &:where([data-theme="dark"], [data-theme="dark"] *) {
     @slot;
   }
   @media (prefers-color-scheme: dark) {
-    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
+    &:where(:not([data-theme="light"], [data-theme="light"] *)) {
       @slot;
     }
   }
 }
 
-/* ---------- Ham token'lar (DESIGN.md tablosu) ---------- */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-heading: var(--font-serif), ui-serif, Georgia, serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-success: var(--success);
+  --color-status-submitted: var(--status-submitted);
+  --color-status-submitted-bg: var(--status-submitted-bg);
+  --color-status-late: var(--status-late);
+  --color-status-late-bg: var(--status-late-bg);
+  --color-status-pending: var(--status-pending);
+  --color-status-pending-bg: var(--status-pending-bg);
+  --color-status-graded: var(--status-graded);
+  --color-status-graded-bg: var(--status-graded-bg);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
 :root {
   color-scheme: light;
+  /* Warm paper background, ink text, deep indigo primary. */
+  --background: oklch(0.985 0.005 85);
+  --foreground: oklch(0.24 0.02 265);
+  --card: oklch(0.998 0.003 85);
+  --card-foreground: oklch(0.24 0.02 265);
+  --popover: oklch(0.998 0.003 85);
+  --popover-foreground: oklch(0.24 0.02 265);
+  --primary: oklch(0.36 0.085 262);
+  --primary-foreground: oklch(0.985 0.005 85);
+  --secondary: oklch(0.955 0.01 85);
+  --secondary-foreground: oklch(0.3 0.03 265);
+  --muted: oklch(0.96 0.008 85);
+  --muted-foreground: oklch(0.46 0.02 265);
+  --accent: oklch(0.94 0.02 262);
+  --accent-foreground: oklch(0.3 0.07 262);
+  --destructive: oklch(0.54 0.2 27);
+  --border: oklch(0.9 0.01 85);
+  --input: oklch(0.86 0.012 85);
+  --ring: oklch(0.5 0.1 262);
+  --chart-1: oklch(0.45 0.1 262);
+  --chart-2: oklch(0.55 0.1 165);
+  --chart-3: oklch(0.7 0.13 80);
+  --chart-4: oklch(0.58 0.17 27);
+  --chart-5: oklch(0.55 0.07 300);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.97 0.008 85);
+  --sidebar-foreground: oklch(0.24 0.02 265);
+  --sidebar-primary: oklch(0.36 0.085 262);
+  --sidebar-primary-foreground: oklch(0.985 0.005 85);
+  --sidebar-accent: oklch(0.93 0.02 262);
+  --sidebar-accent-foreground: oklch(0.28 0.07 262);
+  --sidebar-border: oklch(0.9 0.01 85);
+  --sidebar-ring: oklch(0.5 0.1 262);
 
-  --ink: #13203a;
-  --ink-soft: #4a5872;
-  --paper: #f4f6f9;
-  --surface: #ffffff;
-  --line: #dde2ea;
-  --laurel: #1e6b57;
-  --laurel-tint: #e3f1ec;
-  --saffron: #c98512;
-  --saffron-tint: #fbf0dc;
-  --brick: #b83a28;
-  --brick-tint: #f8e4e0;
-  --sky: #2d5bb8;
-
-  /* Türetilmiş token'lar (DESIGN.md'de yok; yukarıdakilerden türetildi) */
-  --on-accent: #ffffff; /* laurel/brick/sky dolgu üstündeki metin */
-  /* Saffron küçük metinde açık zeminde yetersiz kontrast verir (≈3:1); metin için koyulaştırılmış hali (≈5:1) */
-  --saffron-ink: color-mix(in oklab, var(--saffron) 70%, var(--ink));
-  --sky-tint: color-mix(in oklab, var(--sky) 12%, var(--surface));
-  --line-strong: color-mix(in oklab, var(--line) 70%, var(--ink-soft));
-  --surface-sunken: color-mix(in oklab, var(--paper) 60%, var(--line));
-  --tessera-base: var(--ink);
-  /* Auth paneli her temada koyu: sabit açık metin + DESIGN.md karanlık paletinden taş renkleri */
-  --tessera-fg: #eef1f6;
-  --tessera-laurel: #4fb394;
-  --tessera-saffron: #e8b04b;
-  --tessera-sky: #7ea2e8;
-  --tessera-brick: #e5735f;
-  /* Modal/sheet arka perdesi */
-  --scrim: color-mix(in oklab, var(--ink) 38%, transparent);
+  /* Submission statuses: text color + subtle background. */
+  --status-submitted: oklch(0.42 0.09 165);
+  --status-submitted-bg: oklch(0.95 0.04 165);
+  --status-late: oklch(0.46 0.16 27);
+  --status-late-bg: oklch(0.95 0.03 27);
+  --status-pending: oklch(0.46 0.1 70);
+  --status-pending-bg: oklch(0.96 0.05 85);
+  --status-graded: oklch(0.4 0.12 262);
+  --status-graded-bg: oklch(0.95 0.025 262);
+  --success: oklch(0.5 0.12 150);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
+    --background: oklch(0.19 0.015 265);
+    --foreground: oklch(0.95 0.008 85);
+    --card: oklch(0.235 0.018 265);
+    --card-foreground: oklch(0.95 0.008 85);
+    --popover: oklch(0.25 0.02 265);
+    --popover-foreground: oklch(0.95 0.008 85);
+    --primary: oklch(0.78 0.09 262);
+    --primary-foreground: oklch(0.2 0.03 265);
+    --secondary: oklch(0.28 0.02 265);
+    --secondary-foreground: oklch(0.93 0.01 85);
+    --muted: oklch(0.27 0.018 265);
+    --muted-foreground: oklch(0.72 0.02 265);
+    --accent: oklch(0.31 0.035 262);
+    --accent-foreground: oklch(0.93 0.02 262);
+    --destructive: oklch(0.7 0.17 25);
+    --border: oklch(1 0 0 / 11%);
+    --input: oklch(1 0 0 / 16%);
+    --ring: oklch(0.68 0.1 262);
+    --chart-1: oklch(0.72 0.1 262);
+    --chart-2: oklch(0.72 0.09 165);
+    --chart-3: oklch(0.78 0.11 80);
+    --chart-4: oklch(0.7 0.13 27);
+    --chart-5: oklch(0.68 0.06 300);
+    --sidebar: oklch(0.215 0.017 265);
+    --sidebar-foreground: oklch(0.93 0.01 85);
+    --sidebar-primary: oklch(0.78 0.09 262);
+    --sidebar-primary-foreground: oklch(0.2 0.03 265);
+    --sidebar-accent: oklch(0.3 0.03 262);
+    --sidebar-accent-foreground: oklch(0.95 0.01 85);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.68 0.1 262);
 
-    --ink: #e6eaf2;
-    --ink-soft: #a3aec2;
-    --paper: #0e1525;
-    --surface: #151e31;
-    --line: #26324a;
-    --laurel: #4fb394;
-    --laurel-tint: #16352e;
-    --saffron: #e8b04b;
-    --saffron-tint: #3a2c12;
-    --brick: #e5735f;
-    --brick-tint: #3b1b16;
-    --sky: #7ea2e8;
-
-    --on-accent: #0e1525;
-    --saffron-ink: var(--saffron);
-    --tessera-base: #0a101d;
-    --scrim: color-mix(in oklab, #04070d 65%, transparent);
+    --status-submitted: oklch(0.82 0.1 165);
+    --status-submitted-bg: oklch(0.31 0.05 165);
+    --status-late: oklch(0.8 0.12 25);
+    --status-late-bg: oklch(0.32 0.07 25);
+    --status-pending: oklch(0.84 0.11 85);
+    --status-pending-bg: oklch(0.33 0.06 80);
+    --status-graded: oklch(0.82 0.09 262);
+    --status-graded-bg: oklch(0.31 0.06 262);
+    --success: oklch(0.78 0.12 150);
   }
 }
 
 :root[data-theme="dark"] {
-  color-scheme: dark;
+    color-scheme: dark;
+    --background: oklch(0.19 0.015 265);
+    --foreground: oklch(0.95 0.008 85);
+    --card: oklch(0.235 0.018 265);
+    --card-foreground: oklch(0.95 0.008 85);
+    --popover: oklch(0.25 0.02 265);
+    --popover-foreground: oklch(0.95 0.008 85);
+    --primary: oklch(0.78 0.09 262);
+    --primary-foreground: oklch(0.2 0.03 265);
+    --secondary: oklch(0.28 0.02 265);
+    --secondary-foreground: oklch(0.93 0.01 85);
+    --muted: oklch(0.27 0.018 265);
+    --muted-foreground: oklch(0.72 0.02 265);
+    --accent: oklch(0.31 0.035 262);
+    --accent-foreground: oklch(0.93 0.02 262);
+    --destructive: oklch(0.7 0.17 25);
+    --border: oklch(1 0 0 / 11%);
+    --input: oklch(1 0 0 / 16%);
+    --ring: oklch(0.68 0.1 262);
+    --chart-1: oklch(0.72 0.1 262);
+    --chart-2: oklch(0.72 0.09 165);
+    --chart-3: oklch(0.78 0.11 80);
+    --chart-4: oklch(0.7 0.13 27);
+    --chart-5: oklch(0.68 0.06 300);
+    --sidebar: oklch(0.215 0.017 265);
+    --sidebar-foreground: oklch(0.93 0.01 85);
+    --sidebar-primary: oklch(0.78 0.09 262);
+    --sidebar-primary-foreground: oklch(0.2 0.03 265);
+    --sidebar-accent: oklch(0.3 0.03 262);
+    --sidebar-accent-foreground: oklch(0.95 0.01 85);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.68 0.1 262);
 
-  --ink: #e6eaf2;
-  --ink-soft: #a3aec2;
-  --paper: #0e1525;
-  --surface: #151e31;
-  --line: #26324a;
-  --laurel: #4fb394;
-  --laurel-tint: #16352e;
-  --saffron: #e8b04b;
-  --saffron-tint: #3a2c12;
-  --brick: #e5735f;
-  --brick-tint: #3b1b16;
-  --sky: #7ea2e8;
-
-  --on-accent: #0e1525;
-  --saffron-ink: var(--saffron);
-  --tessera-base: #0a101d;
-  --scrim: color-mix(in oklab, #04070d 65%, transparent);
-}
-
-/* ---------- shadcn/ui semantik değişkenleri → Kodbox token'ları ---------- */
-:root {
-  --background: var(--paper);
-  --foreground: var(--ink);
-  --card: var(--surface);
-  --card-foreground: var(--ink);
-  --popover: var(--surface);
-  --popover-foreground: var(--ink);
-  --primary: var(--laurel);
-  --primary-foreground: var(--on-accent);
-  --secondary: var(--surface-sunken);
-  --secondary-foreground: var(--ink);
-  --muted: var(--paper);
-  --muted-foreground: var(--ink-soft);
-  --accent: var(--paper);
-  --accent-foreground: var(--ink);
-  --destructive: var(--brick);
-  --border: var(--line);
-  --input: var(--line-strong);
-  --ring: var(--laurel);
-  --chart-1: var(--laurel);
-  --chart-2: var(--sky);
-  --chart-3: var(--saffron);
-  --chart-4: var(--brick);
-  --chart-5: var(--ink-soft);
-  --radius: 10px;
-  --sidebar: var(--surface);
-  --sidebar-foreground: var(--ink);
-  --sidebar-primary: var(--laurel);
-  --sidebar-primary-foreground: var(--on-accent);
-  --sidebar-accent: var(--laurel-tint);
-  --sidebar-accent-foreground: var(--laurel);
-  --sidebar-border: var(--line);
-  --sidebar-ring: var(--laurel);
-}
-
-/* ---------- Tailwind tema eşlemesi ---------- */
-@theme inline {
-  /* Kodbox token'ları: bg-paper, text-ink, border-line, bg-laurel-tint … */
-  --color-ink: var(--ink);
-  --color-ink-soft: var(--ink-soft);
-  --color-paper: var(--paper);
-  --color-surface: var(--surface);
-  --color-surface-sunken: var(--surface-sunken);
-  --color-line: var(--line);
-  --color-line-strong: var(--line-strong);
-  --color-laurel: var(--laurel);
-  --color-laurel-tint: var(--laurel-tint);
-  --color-saffron: var(--saffron);
-  --color-saffron-tint: var(--saffron-tint);
-  --color-saffron-ink: var(--saffron-ink);
-  --color-brick: var(--brick);
-  --color-brick-tint: var(--brick-tint);
-  --color-sky: var(--sky);
-  --color-sky-tint: var(--sky-tint);
-  --color-on-accent: var(--on-accent);
-  --color-scrim: var(--scrim);
-  --color-tessera: var(--tessera-base);
-  --color-tessera-fg: var(--tessera-fg);
-  --color-tessera-laurel: var(--tessera-laurel);
-  --color-tessera-saffron: var(--tessera-saffron);
-  --color-tessera-sky: var(--tessera-sky);
-  --color-tessera-brick: var(--tessera-brick);
-
-  /* shadcn/ui semantik renkleri */
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-
-  /* Fontlar (next/font değişkenleri layout.tsx'te tanımlanır) */
-  --font-sans: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-schibsted-grotesk), var(--font-instrument-sans), ui-sans-serif, sans-serif;
-  --font-heading: var(--font-schibsted-grotesk), var(--font-instrument-sans), ui-sans-serif, sans-serif;
-  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
-
-  /* Köşe yarıçapları: input/buton 8px (lg), kart 10px (xl) */
-  --radius-xs: 3px;
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 10px;
-  --radius-2xl: 14px;
-  --radius-3xl: 20px;
-  --radius-4xl: 9999px;
-}
-
-/*
- * Tipografi ölçeği (DESIGN.md): 12 / 13 / 14 (gövde) / 16 / 20 / 24 / 32 / 44
- * Tailwind'in varsayılan ölçeği tamamen kaldırılıp yalnızca bu adımlar tanımlanır.
- *   text-xs 12 · text-label 13 · text-sm 14 (gövde) · text-base 16
- *   text-lg 20 · text-xl 24 · text-2xl 32 · text-3xl 44
- */
-@theme {
-  --text-*: initial;
-  --text-xs: 0.75rem;
-  --text-xs--line-height: 1.45;
-  --text-label: 0.8125rem;
-  --text-label--line-height: 1.45;
-  --text-sm: 0.875rem;
-  --text-sm--line-height: 1.55;
-  --text-base: 1rem;
-  --text-base--line-height: 1.55;
-  --text-lg: 1.25rem;
-  --text-lg--line-height: 1.3;
-  --text-xl: 1.5rem;
-  --text-xl--line-height: 1.2;
-  --text-2xl: 2rem;
-  --text-2xl--line-height: 1.15;
-  --text-3xl: 2.75rem;
-  --text-3xl--line-height: 1.1;
-
-  --tracking-heading: -0.01em;
-
-  /* Düzen ölçüleri */
-  --spacing-sidebar: 248px;
-  --container-content: 1120px;
-
-  --animate-ribbon-pulse: ribbon-pulse 2s ease-in-out infinite;
-
-  @keyframes ribbon-pulse {
-    0%,
-    100% {
-      opacity: 1;
-    }
-    50% {
-      opacity: 0.45;
-    }
-  }
+    --status-submitted: oklch(0.82 0.1 165);
+    --status-submitted-bg: oklch(0.31 0.05 165);
+    --status-late: oklch(0.8 0.12 25);
+    --status-late-bg: oklch(0.32 0.07 25);
+    --status-pending: oklch(0.84 0.11 85);
+    --status-pending-bg: oklch(0.33 0.06 80);
+    --status-graded: oklch(0.82 0.09 262);
+    --status-graded-bg: oklch(0.31 0.06 262);
+    --success: oklch(0.78 0.12 150);
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring;
+    @apply border-border outline-ring/50;
   }
   html {
     @apply font-sans;
     -webkit-text-size-adjust: 100%;
-    text-rendering: optimizeLegibility;
   }
   body {
-    @apply bg-paper text-sm text-ink antialiased;
-    line-height: 1.55;
+    @apply bg-background text-foreground antialiased;
+    overflow-x: clip;
   }
   h1,
   h2,
-  h3,
-  h4 {
-    @apply font-display;
-    line-height: 1.15;
-    letter-spacing: var(--tracking-heading);
+  h3 {
+    @apply font-heading tracking-tight;
     text-wrap: balance;
   }
-  button:not(:disabled),
-  [role="button"]:not(:disabled) {
-    cursor: pointer;
-  }
-  /* Odak halkası: 2px laurel, 2px offset (DESIGN.md · Bileşen kuralları) */
-  :focus-visible {
-    outline: 2px solid var(--laurel);
-    outline-offset: 2px;
-  }
-  ::selection {
-    background: var(--laurel-tint);
-    color: var(--ink);
-  }
-  /* Mono veriler (öğrenci no, ders kodu, tarih, sayaç) hep tabular */
-  .font-mono,
-  code,
-  kbd,
-  samp,
-  pre {
-    font-variant-numeric: tabular-nums;
-    font-feature-settings: "tnum" 1, "zero" 0;
-  }
 }
 
-@layer utilities {
-  .tabular {
-    font-variant-numeric: tabular-nums;
+/* Rendered Markdown (announcements, notes). No typography plugin; kept small and explicit. */
+@layer components {
+  .markdown {
+    @apply text-sm leading-relaxed text-foreground;
+    overflow-wrap: anywhere;
   }
-  /* Ekranda gizli, ekran okuyucuda görünür */
-  .sr-only-focusable:not(:focus):not(:focus-within) {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border-width: 0;
+  .markdown > * + * {
+    @apply mt-3;
   }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  .markdown h1,
+  .markdown h2,
+  .markdown h3,
+  .markdown h4 {
+    @apply font-heading font-semibold leading-snug;
+  }
+  .markdown h1 {
+    @apply text-xl;
+  }
+  .markdown h2 {
+    @apply text-lg;
+  }
+  .markdown h3,
+  .markdown h4 {
+    @apply text-base;
+  }
+  .markdown a {
+    @apply text-primary underline underline-offset-4 hover:no-underline;
+  }
+  .markdown ul {
+    @apply list-disc pl-5;
+  }
+  .markdown ol {
+    @apply list-decimal pl-5;
+  }
+  .markdown li + li {
+    @apply mt-1;
+  }
+  .markdown blockquote {
+    @apply border-l-2 border-border pl-3 text-muted-foreground;
+  }
+  .markdown code {
+    @apply rounded bg-muted px-1 py-0.5 font-mono text-[0.85em];
+  }
+  .markdown pre {
+    @apply overflow-x-auto rounded-lg bg-muted p-3;
+  }
+  .markdown pre code {
+    @apply bg-transparent p-0;
+  }
+  .markdown hr {
+    @apply border-border;
+  }
+  .markdown table {
+    @apply block w-full overflow-x-auto text-left;
+  }
+  .markdown th,
+  .markdown td {
+    @apply border border-border px-2 py-1;
+  }
+  .markdown th {
+    @apply bg-muted font-medium;
+  }
+  .markdown img {
+    @apply h-auto max-w-full rounded-md;
   }
 }

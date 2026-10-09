@@ -3,8 +3,8 @@ import "server-only";
 import { headers } from "next/headers";
 
 /**
- * İstemci IP'si. Canlıda Coolify/Traefik ters vekili `x-forwarded-for` ekler; ilk değer
- * gerçek istemcidir. Sadece rate limit ve Turnstile için kullanılır; DB'ye kalıcı yazılmaz.
+ * Client IP. Behind the Coolify/Traefik reverse proxy `x-forwarded-for` carries the real client
+ * as its first value. Used only for rate limiting and Turnstile; never stored permanently.
  */
 export async function getClientIp(): Promise<string> {
   const h = await headers();

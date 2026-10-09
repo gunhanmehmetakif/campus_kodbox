@@ -1,5 +1,5 @@
 {
-  "id": "0b30431d-39d2-4856-8f10-0ace1f7af11e",
+  "id": "79ea3e6c-4072-42c0-be0f-d1f065ad302e",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -109,14 +109,8 @@
           "notNull": true,
           "default": "'draft'"
         },
-        "publish_at": {
-          "name": "publish_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "notified_at": {
-          "name": "notified_at",
+        "published_at": {
+          "name": "published_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -181,23 +175,22 @@
             }
           ],
           "isUnique": false,
-          "where": "\"assignments\".\"status\" = 'published'",
           "concurrently": false,
           "method": "btree",
           "with": {}
         },
-        "assignments_pending_publish_idx": {
-          "name": "assignments_pending_publish_idx",
+        "assignments_published_due_idx": {
+          "name": "assignments_published_due_idx",
           "columns": [
             {
-              "expression": "publish_at",
+              "expression": "due_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             }
           ],
           "isUnique": false,
-          "where": "\"assignments\".\"status\" = 'published' AND \"assignments\".\"notified_at\" IS NULL",
+          "where": "\"assignments\".\"status\" = 'published' AND \"assignments\".\"due_at\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -237,7 +230,7 @@
       "checkConstraints": {
         "assignments_published_has_date_chk": {
           "name": "assignments_published_has_date_chk",
-          "value": "\"assignments\".\"status\" <> 'published' OR \"assignments\".\"publish_at\" IS NOT NULL"
+          "value": "\"assignments\".\"status\" <> 'published' OR \"assignments\".\"published_at\" IS NOT NULL"
         },
         "assignments_late_window_chk": {
           "name": "assignments_late_window_chk",
@@ -416,6 +409,12 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "display_name_enc": {
+          "name": "display_name_enc",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "user_id": {
           "name": "user_id",
@@ -1112,14 +1111,8 @@
           "notNull": true,
           "default": "'draft'"
         },
-        "publish_at": {
-          "name": "publish_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "notified_at": {
-          "name": "notified_at",
+        "published_at": {
+          "name": "published_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -1156,29 +1149,13 @@
               "nulls": "last"
             },
             {
-              "expression": "publish_at",
+              "expression": "published_at",
               "isExpression": false,
               "asc": false,
               "nulls": "last"
             }
           ],
           "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "posts_pending_publish_idx": {
-          "name": "posts_pending_publish_idx",
-          "columns": [
-            {
-              "expression": "publish_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"posts\".\"status\" = 'published' AND \"posts\".\"notified_at\" IS NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -1218,9 +1195,117 @@
       "checkConstraints": {
         "posts_published_has_date_chk": {
           "name": "posts_published_has_date_chk",
-          "value": "\"posts\".\"status\" <> 'published' OR \"posts\".\"publish_at\" IS NOT NULL"
+          "value": "\"posts\".\"status\" <> 'published' OR \"posts\".\"published_at\" IS NOT NULL"
         }
       },
+      "isRLSEnabled": false
+    },
+    "public.push_subscriptions": {
+      "name": "push_subscriptions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "endpoint": {
+          "name": "endpoint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "p256dh": {
+          "name": "p256dh",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "auth": {
+          "name": "auth",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_used_at": {
+          "name": "last_used_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "push_subscriptions_endpoint_uq": {
+          "name": "push_subscriptions_endpoint_uq",
+          "columns": [
+            {
+              "expression": "endpoint",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "push_subscriptions_user_id_idx": {
+          "name": "push_subscriptions_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "push_subscriptions_user_id_users_id_fk": {
+          "name": "push_subscriptions_user_id_users_id_fk",
+          "tableFrom": "push_subscriptions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.rate_limits": {
@@ -1364,6 +1449,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "schools_staff_email_domain_uq": {
+          "name": "schools_staff_email_domain_uq",
+          "columns": [
+            {
+              "expression": "staff_email_domain",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -1393,6 +1493,13 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
+        },
+        "remember": {
+          "name": "remember",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
         },
         "expires_at": {
           "name": "expires_at",
@@ -2073,7 +2180,7 @@
       "checkConstraints": {
         "users_student_no_role_chk": {
           "name": "users_student_no_role_chk",
-          "value": "(\"users\".\"role\" = 'student' AND \"users\".\"student_no_hash\" IS NOT NULL AND \"users\".\"student_no_enc\" IS NOT NULL)\n       OR (\"users\".\"role\" <> 'student' AND \"users\".\"student_no_hash\" IS NULL AND \"users\".\"student_no_enc\" IS NULL)"
+          "value": "(\"users\".\"role\" = 'student' AND \"users\".\"student_no_hash\" IS NOT NULL AND \"users\".\"student_no_enc\" IS NOT NULL AND \"users\".\"display_name\" IS NULL)\n       OR (\"users\".\"role\" <> 'student' AND \"users\".\"student_no_hash\" IS NULL AND \"users\".\"student_no_enc\" IS NULL)"
         },
         "users_active_has_password_chk": {
           "name": "users_active_has_password_chk",
