@@ -13,6 +13,14 @@ export default function AuthLayout({ children }: LayoutProps<"/">) {
         <p className="text-sm text-muted-foreground">{APP_TAGLINE}</p>
       </div>
       <div className="w-full max-w-md">{children}</div>
+      <footer>
+        <Link
+          href="/kvkk"
+          className="inline-flex min-h-11 items-center text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+        >
+          KVKK aydınlatma metni
+        </Link>
+      </footer>
     </main>
   );
 }

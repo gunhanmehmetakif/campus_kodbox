@@ -45,3 +45,8 @@ next-env.d.ts
 
 # local dev mail output
 /.dev-mail/
+
+# playwright
+/tests/e2e/.auth/
+/playwright-report/
+/test-results/

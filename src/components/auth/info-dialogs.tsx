@@ -13,7 +13,7 @@ import { APP_NAME, SCHOOL_EMAIL_DOMAINS } from "@/config/app";
 const triggerClass =
   "inline-flex min-h-11 items-center text-sm text-primary underline underline-offset-4 hover:no-underline";
 
-/** KVKK disclosure shown from the registration form. Draft text; to be confirmed by the school/legal. */
+/** Short KVKK summary shown from the registration form; the full text lives at /kvkk. */
 export function KvkkDialog() {
   return (
     <Dialog>
@@ -23,27 +23,32 @@ export function KvkkDialog() {
           <DialogTitle>KVKK aydınlatma metni</DialogTitle>
           <DialogDescription>{APP_NAME} kişisel verilerinizi nasıl işler?</DialogDescription>
         </DialogHeader>
-        <div className="space-y-3 text-sm leading-relaxed">
-          <p>
-            <strong>İşlenen veriler:</strong> öğrenci numaranız, okul mail adresiniz, şifrenizin geri döndürülemez
-            özeti, ders kayıtlarınız, ödev teslimleriniz ve aldığınız puanlar. Ad ve soyad bilgisi tutulmaz.
-          </p>
-          <p>
-            <strong>Amaç:</strong> derslere erişiminizi sağlamak, ödev teslimini ve değerlendirmesini yürütmek,
-            hesabınızın güvenliğini korumak ve size sistem bildirimleri göndermek.
-          </p>
-          <p>
-            <strong>Saklama ve koruma:</strong> öğrenci numaranız ve mail adresiniz şifrelenerek saklanır. Yönetici
-            numaranızı maskeli görür; yalnızca dersinizin eğitmeni tam numaranızı görebilir.
-          </p>
-          <p>
-            <strong>Paylaşım:</strong> verileriniz yasal zorunluluklar dışında üçüncü kişilerle paylaşılmaz.
-          </p>
-          <p>
+        <ul className="list-disc space-y-3 pl-5 text-sm leading-relaxed marker:text-muted-foreground">
+          <li>
+            <strong>Hangi veriler:</strong> öğrenci numaranız, okul e-posta adresiniz, ders kayıtlarınız, ödev
+            teslimleriniz ve puanlarınız. Ad soyad istenmez.
+          </li>
+          <li>
+            <strong>Neden:</strong> derslere erişiminizi sağlamak, ödev teslimini ve değerlendirmesini yürütmek,
+            hesabınızı korumak ve bildirim göndermek.
+          </li>
+          <li>
+            <strong>Kimler görür:</strong> dersinizin eğitmeni tam numaranızı görür, yönetici yalnızca maskeli
+            halini. Verileriniz satılmaz ve reklam için paylaşılmaz.
+          </li>
+          <li>
             <strong>Haklarınız:</strong> verilerinizin işlenip işlenmediğini öğrenme, düzeltilmesini veya silinmesini
-            isteme haklarına sahipsiniz. Başvurular için okul yönetimiyle iletişime geçin.
-          </p>
-        </div>
+            isteme ve başvuru hakkına sahipsiniz (KVKK m.11).
+          </li>
+        </ul>
+        <a
+          href="/kvkk"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline underline-offset-4 hover:no-underline"
+        >
+          Tam metni oku
+        </a>
       </DialogContent>
     </Dialog>
   );

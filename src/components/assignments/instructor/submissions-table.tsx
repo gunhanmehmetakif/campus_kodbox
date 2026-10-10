@@ -1,7 +1,6 @@
 "use client";
 
 import { Check, ExternalLink, History, Loader2, MessageSquare, MessageSquareText } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -41,7 +40,6 @@ type SubmissionsTableProps = {
 };
 
 export function SubmissionsTable({ rows, histories, maxScore, penalty, editable }: SubmissionsTableProps) {
-  const router = useRouter();
   const canGrade = editable && maxScore !== null;
   const tableRef = useRef<HTMLTableElement>(null);
   const [overrides, setOverrides] = useState<Record<string, Grade>>({});
@@ -80,8 +78,6 @@ export function SubmissionsTable({ rows, histories, maxScore, penalty, editable 
     }
     if (result.ok) {
       setProgress((p) => ({ ...p, [id]: "saved" }));
-      // Re-renders the server panel (publish count) without touching client state or focus.
-      router.refresh();
       return true;
     }
     setOverrides((o) => ({ ...o, [id]: previous }));

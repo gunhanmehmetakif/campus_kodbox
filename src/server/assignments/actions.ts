@@ -1,8 +1,11 @@
 "use server";
 
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 
+import { db } from "@/db";
+import { submissions } from "@/db/schema";
 import { fail, failFromZod, failUnexpected, ok, type ActionResult } from "@/lib/action";
 import { requireRole } from "@/lib/auth";
 import { routes } from "@/lib/routes";
@@ -92,7 +95,15 @@ export async function gradeSubmissionAction(
     const user = await requireRole("instructor");
     const parsed = gradeSubmissionSchema.safeParse(formToObject(formData));
     if (!parsed.success) return failFromZod(parsed.error);
-    return ok(await gradeSubmission(user, parsed.data));
+    const result = await gradeSubmission(user, parsed.data);
+    // The service validated ownership; look up the assignment only to refresh its pages.
+    const [row] = await db
+      .select({ assignmentId: submissions.assignmentId })
+      .from(submissions)
+      .where(eq(submissions.id, parsed.data.submissionId))
+      .limit(1);
+    if (row) revalidateAssignment(row.assignmentId);
+    return ok(result);
   } catch (error) {
     return toFailure(error);
   }

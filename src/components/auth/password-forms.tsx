@@ -59,7 +59,7 @@ export function CompleteRegistrationForm({ token, email }: { token: string; emai
             aria-describedby={kvkkErrors?.length ? kvkkErrorId : undefined}
           />
           <Label htmlFor={kvkkId} className="text-sm leading-snug font-normal">
-            KVKK aydınlatma metnini okudum, onaylıyorum.
+            Aydınlatma metnini okudum.
           </Label>
         </div>
         <KvkkDialog />

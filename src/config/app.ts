@@ -15,3 +15,24 @@ export const AUDIENCE_LABELS: Record<SchoolAudience, string> = {
   student: "Öğrenci",
   staff: "Personel",
 };
+
+export type LegalInfo = {
+  controllerName: string | null;
+  address: string | null;
+  email: string | null;
+  kep: string | null;
+  hostingProvider: string | null;
+  hostingCountry: string | null;
+  effectiveDate: string | null;
+};
+
+/** Data controller details for the KVKK notice. `null` fields render as "[belirlenecek]" and keep the draft banner on. */
+export const LEGAL: LegalInfo = {
+  controllerName: null,
+  address: null,
+  email: null,
+  kep: null,
+  hostingProvider: null,
+  hostingCountry: null,
+  effectiveDate: null,
+};

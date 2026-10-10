@@ -29,7 +29,7 @@ describe.skipIf(!available)("notifications service (DB)", async () => {
   const { notify } = await import("@/lib/server/notifications");
   const service = await import("@/server/notifications/service");
   const reminders = await import("@/server/notifications/reminders");
-  const { users, terms, courses, courseRoster, assignments, submissions, notifications, pushSubscriptions, sessions, schools } =
+  const { users, terms, courses, courseRoster, assignments, submissions, notifications, pushSubscriptions, sessions, schools, auditLogs, emailTokens } =
     schema;
 
   const createdUserIds: string[] = [];
@@ -216,6 +216,61 @@ describe.skipIf(!available)("notifications service (DB)", async () => {
       const keptSessions = await db.select().from(sessions).where(eq(sessions.userId, userId));
       expect(keptSessions).toHaveLength(1);
       expect(keptSessions[0]!.id.startsWith("valid-")).toBe(true);
+    });
+  });
+
+  describe("runCleanup retention (KVKK 6)", () => {
+    const day = 86_400_000;
+
+    it("deletes audit logs older than 2 years and keeps newer ones", async () => {
+      const now = new Date();
+      const tag = rnd();
+      const [oldRow, newRow] = await db
+        .insert(auditLogs)
+        .values([
+          { action: "test.old", targetId: tag, createdAt: new Date(now.getTime() - 731 * day) },
+          { action: "test.recent", targetId: tag, createdAt: new Date(now.getTime() - 729 * day) },
+        ])
+        .returning({ id: auditLogs.id });
+
+      const result = await reminders.runCleanup(now);
+      expect(result.auditLogs).toBeGreaterThanOrEqual(1);
+
+      const left = await db.select({ id: auditLogs.id }).from(auditLogs).where(eq(auditLogs.targetId, tag));
+      expect(left.map((r) => r.id)).toEqual([newRow!.id]);
+      expect(left.map((r) => r.id)).not.toContain(oldRow!.id);
+      await db.delete(auditLogs).where(eq(auditLogs.targetId, tag));
+    });
+
+    it("deletes email tokens expired or used more than 7 days ago, keeps the rest", async () => {
+      const now = new Date();
+      const tag = rnd();
+      const make = (name: string, over: Partial<typeof emailTokens.$inferInsert>) => ({
+        schoolId: school.id,
+        loginIdHash: tag,
+        purpose: "verify" as const,
+        tokenHash: `${name}-${tag}`,
+        expiresAt: new Date(now.getTime() + day),
+        ...over,
+      });
+      await db.insert(emailTokens).values([
+        make("expired-old", { expiresAt: new Date(now.getTime() - 8 * day) }),
+        make("used-old", { usedAt: new Date(now.getTime() - 8 * day) }),
+        make("expired-recent", { expiresAt: new Date(now.getTime() - 2 * day) }),
+        make("used-recent", { usedAt: new Date(now.getTime() - 2 * day) }),
+        make("valid", {}),
+      ]);
+
+      const result = await reminders.runCleanup(now);
+      expect(result.emailTokens).toBeGreaterThanOrEqual(2);
+
+      const left = await db.select().from(emailTokens).where(eq(emailTokens.loginIdHash, tag));
+      expect(left.map((t) => t.tokenHash.split("-").slice(0, -5).join("-")).sort()).toEqual([
+        "expired-recent",
+        "used-recent",
+        "valid",
+      ]);
+      await db.delete(emailTokens).where(eq(emailTokens.loginIdHash, tag));
     });
   });
 
