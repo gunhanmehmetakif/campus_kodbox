@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Archive, ExternalLink, Info } from "lucide-react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
@@ -35,6 +36,13 @@ async function AssignmentContent({ params }: { params: PageProps<"/ogrenci/odevl
 
   return (
     <div className="space-y-5">
+      <Link
+        href={`/ogrenci/dersler/${a.course.id}`}
+        className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 hover:underline"
+      >
+        ← {a.course.code}
+      </Link>
+
       {result ? <ResultCard result={result} /> : null}
 
       <PageHeader title={a.title} description={`${a.course.code} · ${a.course.name}`} />

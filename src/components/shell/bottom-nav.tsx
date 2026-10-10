@@ -18,7 +18,7 @@ const itemClass =
   "flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-[0.7rem] font-medium text-muted-foreground outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50";
 
 /** Mobile bottom bar (below md). Non-primary items collapse into a "Daha" menu. */
-export function BottomNav({ role }: { role: Role }) {
+export function BottomNav({ role, hasUnread = false }: { role: Role; hasUnread?: boolean }) {
   const pathname = usePathname();
   const items = NAV_ITEMS[role];
   const primary = items.filter((i) => i.primary);
@@ -38,7 +38,15 @@ export function BottomNav({ role }: { role: Role }) {
             aria-current={active ? "page" : undefined}
             className={cn(itemClass, active && "text-primary")}
           >
-            <item.icon className="size-5" aria-hidden="true" />
+            <span className="relative">
+              <item.icon className="size-5" aria-hidden="true" />
+              {hasUnread && item.href === "/bildirimler" ? (
+                <>
+                  <span className="absolute -top-0.5 -right-1 size-2.5 rounded-full border-2 border-background bg-destructive" aria-hidden="true" />
+                  <span className="sr-only">Okunmamış bildirim var</span>
+                </>
+              ) : null}
+            </span>
             <span className="max-w-full truncate">{item.label}</span>
           </Link>
         );

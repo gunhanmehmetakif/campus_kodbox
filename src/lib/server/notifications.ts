@@ -1,9 +1,14 @@
 import "server-only";
 
 import { and, count, desc, eq, inArray, isNull } from "drizzle-orm";
+import { after } from "next/server";
 
 import { db, type DbOrTx } from "@/db";
 import { notifications } from "@/db/schema";
+import { isPushConfigured } from "@/lib/env";
+import { formatNotification } from "@/lib/notification-format";
+
+import { deliverPush } from "./push";
 
 /**
  * In-app notifications (PRD section 6). F0 provides the data API and a push hook stub;
@@ -45,16 +50,31 @@ export type NotificationPayloads = {
 export type NotificationType = keyof NotificationPayloads;
 
 /**
- * Web push delivery hook. F6 implements it with web-push and the push_subscriptions table;
- * for now it is a no-op so callers of `notify` need no change later.
+ * Sends web push for a notification after the response (`after`), so it never goes out before
+ * the surrounding transaction commits. Never throws: outside a request scope (tests, scripts)
+ * push is skipped.
  */
 export async function sendPushForNotification(
   userIds: readonly string[],
   type: NotificationType,
   payload: Record<string, unknown>,
 ): Promise<void> {
-  // Implemented in F6.
-  void [userIds, type, payload];
+  try {
+    if (userIds.length === 0 || !isPushConfigured()) return;
+    const view = formatNotification(type, payload);
+    const topic = [payload.assignmentId, payload.postId, payload.courseId].find((v) => typeof v === "string");
+    const message = {
+      title: view.title,
+      body: view.body,
+      url: view.href,
+      tag: `${type}:${typeof topic === "string" ? topic : "general"}`,
+      urgent: type === "assignment.due_soon",
+    };
+    const ids = [...userIds];
+    after(() => deliverPush(ids, message));
+  } catch {
+    // `after` outside a request scope, or env not configured: skip push.
+  }
 }
 
 /**

@@ -29,7 +29,8 @@ export const metadata: Metadata = {
   description: APP_TAGLINE,
   applicationName: APP_NAME,
   manifest: "/manifest.webmanifest",
-  icons: { icon: "/icons/icon.svg" },
+  icons: { icon: "/icons/icon.svg", apple: "/icons/apple-touch-icon.png" },
+  appleWebApp: { capable: true, title: APP_NAME, statusBarStyle: "default" },
 };
 
 // Browser chrome color must be a literal value (cannot reference CSS tokens).

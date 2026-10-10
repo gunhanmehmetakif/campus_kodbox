@@ -2,7 +2,7 @@ import { Bell } from "lucide-react";
 import Link from "next/link";
 
 type NotificationBellProps = {
-  /** Unread count; placeholder until notifications are wired (F6). */
+  /** Unread notification count. */
   count?: number;
 };
 

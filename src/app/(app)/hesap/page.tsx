@@ -6,10 +6,12 @@ import { AccountToaster } from "@/components/account/account-toaster";
 import { GoogleLinkCard } from "@/components/account/google-link-card";
 import { SignOutOthers } from "@/components/account/sign-out-others";
 import { WelcomeCard } from "@/components/account/welcome-card";
+import { PushToggleCard } from "@/components/notifications/push-toggle-card";
 import { PageHeader } from "@/components/common/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAccountOverview } from "@/server/auth/queries";
+import { getPushConfig } from "@/server/notifications/queries";
 
 export const metadata: Metadata = { title: "Hesap" };
 
@@ -20,7 +22,7 @@ function first(value: string | string[] | undefined): string | undefined {
 }
 
 export default async function AccountPage({ searchParams }: { searchParams: SearchParams }) {
-  const [params, account] = await Promise.all([searchParams, getAccountOverview()]);
+  const [params, account, push] = await Promise.all([searchParams, getAccountOverview(), getPushConfig()]);
   const welcome = first(params.hosgeldin) === "1";
   const identityLabel = account.role === "student" ? "Öğrenci numarası" : "Ad";
   const showGoogle = account.googleEnabled || account.google !== null;
@@ -51,6 +53,8 @@ export default async function AccountPage({ searchParams }: { searchParams: Sear
           </dl>
         </CardContent>
       </Card>
+
+      {account.role === "student" ? <PushToggleCard publicKey={push.publicKey} /> : null}
 
       {showGoogle ? <GoogleLinkCard google={account.google} /> : null}
 

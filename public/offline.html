@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bağlantı yok</title>
+<style>
+  :root { color-scheme: light dark; --bg: #faf8f3; --fg: #1f2433; --muted: #5d6475; --accent: #2b3a67; --accent-fg: #faf8f3; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1c1e29; --fg: #f1eee6; --muted: #a3a9ba; --accent: #8c9be0; --accent-fg: #1c1e29; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--bg); color: var(--fg); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; text-align: center; }
+  main { max-width: 22rem; }
+  h1 { margin: 0 0 8px; font-family: Georgia, "Times New Roman", serif; font-size: 1.75rem; font-weight: 600; }
+  p { margin: 0 0 24px; color: var(--muted); line-height: 1.5; }
+  button { min-height: 44px; padding: 0 24px; border: 0; border-radius: 10px; background: var(--accent); color: var(--accent-fg); font: inherit; font-weight: 600; cursor: pointer; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Bağlantı yok</h1>
+  <p>İnternet bağlantınız geri geldiğinde sayfayı yenileyin.</p>
+  <button type="button" onclick="location.reload()">Yeniden dene</button>
+</main>
+</body>
+</html>

@@ -4,6 +4,9 @@ import { Logo } from "@/components/brand/logo";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { PushPrompt } from "@/components/notifications/push-prompt";
+import { ServiceWorkerRegister } from "@/components/notifications/service-worker-register";
+import { getMyUnreadCount, getPushConfig } from "@/server/notifications/queries";
 
 import { BottomNav } from "./bottom-nav";
 import { ROLE_HOME } from "./nav-items";
@@ -20,6 +23,11 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
   if (!user) redirect("/giris");
   if (user.mustChangePassword) redirect("/sifre-degistir");
 
+  const [unread, push] = await Promise.all([
+    getMyUnreadCount(),
+    user.role === "student" ? getPushConfig() : Promise.resolve(null),
+  ]);
+
   const label = user.displayName ?? (user.role === "student" ? "Öğrenci" : "Hesabım");
 
   return (
@@ -32,7 +40,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           <Logo />
         </Link>
         <div className="flex items-center gap-1">
-          <NotificationBell count={0} />
+          <NotificationBell count={unread} />
           <UserMenu role={user.role} label={label} />
         </div>
       </header>
@@ -41,10 +49,14 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           <SidebarNav role={user.role} />
         </aside>
         <main className="min-w-0 flex-1 px-4 pt-5 pb-24 sm:px-6 md:pb-10">
-          <div className="mx-auto w-full max-w-5xl">{children}</div>
+          <div className="mx-auto w-full max-w-5xl">
+            {push ? <PushPrompt publicKey={push.publicKey} /> : null}
+            {children}
+          </div>
         </main>
       </div>
-      <BottomNav role={user.role} />
+      <BottomNav role={user.role} hasUnread={unread > 0} />
+      <ServiceWorkerRegister />
     </div>
   );
 }
