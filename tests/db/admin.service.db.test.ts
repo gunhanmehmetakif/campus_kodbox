@@ -139,7 +139,6 @@ describe.skipIf(!available)("admin service (DB)", async () => {
       kind: "staff",
       local,
       password: created.tempPassword,
-      ip: `test-${crypto.randomUUID()}`,
     });
     expect(login).toMatchObject({ ok: true, userId: created.id, role: "instructor", mustChangePassword: true });
 

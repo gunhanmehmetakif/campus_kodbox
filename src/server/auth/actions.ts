@@ -24,6 +24,7 @@ import {
 import {
   authenticate,
   changePassword,
+  consumeLoginIpBudget,
   completeRegistration,
   requestPasswordReset,
   requestRegistration,
@@ -87,16 +88,21 @@ export async function loginAction(_prev: Prev<void>, formData: FormData): Promis
     const parsed = loginSchema.safeParse(formToObject(formData));
     if (!parsed.success) return failFromZod(parsed.error);
 
+    // Count the IP first so captcha failures also use up the budget.
     const ip = await getClientIp();
+    const ipLimit = await consumeLoginIpBudget(ip);
+    if (!ipLimit.ok) return lockedError(ipLimit.retryAfter);
     if (!(await verifyTurnstile(formData.get(TURNSTILE_FIELD), ip)).ok) return fail(CAPTCHA_ERROR);
 
     const result = await authenticate({
       kind: parsed.data.kind,
       local: parsed.data.local,
       password: parsed.data.password,
-      ip,
     });
-    if (!result.ok) return result.reason === "locked" ? lockedError(result.retryAfter) : fail(LOGIN_ERROR);
+    if (!result.ok) {
+      if (result.reason === "locked") return lockedError(result.retryAfter);
+      return fail(result.attemptsLeft ? `${LOGIN_ERROR} ${result.attemptsLeft} deneme hakkınız kaldı.` : LOGIN_ERROR);
+    }
 
     await createSession(result.userId, { remember: parsed.data.remember === "on" });
     target = result.mustChangePassword

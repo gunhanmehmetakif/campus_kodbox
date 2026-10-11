@@ -6,7 +6,7 @@ import { useActionState, useRef } from "react";
 
 import { AudienceEmailField } from "@/components/auth/audience-email-field";
 import { FormError, SubmitButton, fieldMessages, formError, useFocusOnError } from "@/components/auth/form-parts";
-import { Turnstile } from "@/components/auth/turnstile";
+import { Turnstile, useTurnstileToken } from "@/components/auth/turnstile";
 import { forgotPasswordAction } from "@/server/auth/actions";
 
 const linkClass =
@@ -15,6 +15,7 @@ const linkClass =
 export function ForgotPasswordForm({ turnstileSiteKey }: { turnstileSiteKey: string }) {
   const [state, formAction] = useActionState(forgotPasswordAction, null);
   const formRef = useRef<HTMLFormElement>(null);
+  const captcha = useTurnstileToken(turnstileSiteKey);
   useFocusOnError(formRef, state);
 
   if (state?.ok) {
@@ -43,8 +44,10 @@ export function ForgotPasswordForm({ turnstileSiteKey }: { turnstileSiteKey: str
       <form ref={formRef} action={formAction} noValidate className="space-y-4">
         <FormError message={formError(state)} />
         <AudienceEmailField storageKey="kodbox:login-audience" errors={fieldMessages(state, "local")} />
-        <Turnstile siteKey={turnstileSiteKey} resetSignal={state} />
-        <SubmitButton pendingLabel="Gönderiliyor…">Sıfırlama linki gönder</SubmitButton>
+        <Turnstile siteKey={turnstileSiteKey} resetSignal={state} onTokenChange={captcha.onTokenChange} />
+        <SubmitButton pendingLabel="Gönderiliyor…" disabled={captcha.waiting}>
+          {captcha.waiting ? "Doğrulanıyor…" : "Sıfırlama linki gönder"}
+        </SubmitButton>
       </form>
       <Link href="/giris" className={linkClass}>
         Girişe dön

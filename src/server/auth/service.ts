@@ -344,19 +344,21 @@ export async function completeRegistration(input: {
 
 export type AuthenticateResult =
   | { ok: true; userId: string; role: UserRole; mustChangePassword: boolean }
-  | { ok: false; reason: "invalid" }
+  | { ok: false; reason: "invalid"; attemptsLeft?: number }
   | { ok: false; reason: "locked"; retryAfter: number };
 
+/** Counts one login attempt for the IP (called by the action before the captcha check). */
+export function consumeLoginIpBudget(ip: string) {
+  return consume(rateLimitKey("login-ip", ip), RATE_LIMITS.loginPerIp);
+}
+
+/** `attemptsLeft` is only set when 1 or 2 failures remain before the account lock. */
 export async function authenticate(input: {
   kind: LoginKind;
   local: string;
   password: string;
-  ip: string;
 }): Promise<AuthenticateResult> {
   const school = await requireDefaultSchool();
-
-  const ipLimit = await consume(rateLimitKey("login-ip", input.ip), RATE_LIMITS.loginPerIp);
-  if (!ipLimit.ok) return { ok: false, reason: "locked", retryAfter: ipLimit.retryAfter };
 
   const identity = resolveIdentity(input.kind, input.local, school);
   if (!identity) {
@@ -375,8 +377,10 @@ export async function authenticate(input: {
     : await verifyPasswordDummy(input.password);
 
   if (!user || !verified || user.status !== "active") {
-    await consume(failKey, RATE_LIMITS.loginFailures);
-    return { ok: false, reason: "invalid" };
+    const { remaining } = await consume(failKey, RATE_LIMITS.loginFailures);
+    return remaining >= 1 && remaining <= 2
+      ? { ok: false, reason: "invalid", attemptsLeft: remaining }
+      : { ok: false, reason: "invalid" };
   }
 
   await resetRateLimit(failKey);

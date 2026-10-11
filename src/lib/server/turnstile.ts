@@ -18,6 +18,11 @@ const VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
 export type TurnstileResult = { ok: true } | { ok: false; errorCodes: string[] };
 
+function failed(errorCodes: string[]): TurnstileResult {
+  console.warn("[turnstile] verification failed", { errorCodes });
+  return { ok: false, errorCodes };
+}
+
 export async function verifyTurnstile(
   token: FormDataEntryValue | string | null | undefined,
   ip?: string | null,
@@ -25,7 +30,7 @@ export async function verifyTurnstile(
   if (env.TURNSTILE_DEV_BYPASS) return { ok: true };
 
   if (typeof token !== "string" || token.length === 0 || token.length > 2048) {
-    return { ok: false, errorCodes: ["missing-input-response"] };
+    return failed(["missing-input-response"]);
   }
 
   const body = new URLSearchParams({ secret: env.TURNSTILE_SECRET_KEY, response: token });
@@ -39,12 +44,12 @@ export async function verifyTurnstile(
       signal: AbortSignal.timeout(8_000),
       cache: "no-store",
     });
-    if (!res.ok) return { ok: false, errorCodes: [`http-${res.status}`] };
+    if (!res.ok) return failed([`http-${res.status}`]);
     const data = (await res.json()) as { success: boolean; "error-codes"?: string[] };
-    return data.success ? { ok: true } : { ok: false, errorCodes: data["error-codes"] ?? ["unknown"] };
+    return data.success ? { ok: true } : failed(data["error-codes"] ?? ["unknown"]);
   } catch (error) {
     console.error("[turnstile] verification request failed", error);
-    return { ok: false, errorCodes: ["network-error"] };
+    return failed(["network-error"]);
   }
 }
 

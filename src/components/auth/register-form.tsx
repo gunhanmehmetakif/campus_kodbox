@@ -15,7 +15,7 @@ import {
 } from "@/components/auth/form-parts";
 import { MailHelpDialog } from "@/components/auth/info-dialogs";
 import { SchoolEmailInput } from "@/components/auth/school-email-input";
-import { Turnstile } from "@/components/auth/turnstile";
+import { Turnstile, useTurnstileToken } from "@/components/auth/turnstile";
 import { Label } from "@/components/ui/label";
 import { SCHOOL_EMAIL_DOMAINS } from "@/config/app";
 import { registerAction, resendVerificationAction } from "@/server/auth/actions";
@@ -39,6 +39,7 @@ export function RegisterForm({ turnstileSiteKey, oauthUnlinked }: RegisterFormPr
   const [state, formAction] = useActionState(registerAction, null);
   const formRef = useRef<HTMLFormElement>(null);
   useFocusOnError(formRef, state);
+  const captcha = useTurnstileToken(turnstileSiteKey);
   const inputId = useId();
   const errorId = useId();
 
@@ -70,8 +71,10 @@ export function RegisterForm({ turnstileSiteKey, oauthUnlinked }: RegisterFormPr
           />
           <FieldError id={errorId} messages={errors} />
         </div>
-        <Turnstile siteKey={turnstileSiteKey} resetSignal={state} />
-        <SubmitButton pendingLabel="Gönderiliyor…">Doğrulama linki gönder</SubmitButton>
+        <Turnstile siteKey={turnstileSiteKey} resetSignal={state} onTokenChange={captcha.onTokenChange} />
+        <SubmitButton pendingLabel="Gönderiliyor…" disabled={captcha.waiting}>
+          {captcha.waiting ? "Doğrulanıyor…" : "Doğrulama linki gönder"}
+        </SubmitButton>
       </form>
       <Link href="/giris" className={linkClass}>
         Zaten hesabım var
@@ -83,6 +86,7 @@ export function RegisterForm({ turnstileSiteKey, oauthUnlinked }: RegisterFormPr
 function MailSent({ local, turnstileSiteKey }: { local: string; turnstileSiteKey: string }) {
   const [secondsLeft, setSecondsLeft] = useState(RESEND_SECONDS);
   const formRef = useRef<HTMLFormElement>(null);
+  const captcha = useTurnstileToken(turnstileSiteKey);
 
   useEffect(() => {
     if (secondsLeft <= 0) return;
@@ -122,8 +126,8 @@ function MailSent({ local, turnstileSiteKey }: { local: string; turnstileSiteKey
         <FormError message={formError(state)} />
         {resent ? <FormNotice>Yeni mail gönderildi.</FormNotice> : null}
         <input type="hidden" name="local" value={local} />
-        <Turnstile siteKey={turnstileSiteKey} resetSignal={state} />
-        <ResendButton secondsLeft={secondsLeft} />
+        <Turnstile siteKey={turnstileSiteKey} resetSignal={state} onTokenChange={captcha.onTokenChange} />
+        <ResendButton secondsLeft={secondsLeft} waiting={captcha.waiting} />
       </form>
       <div className="flex justify-center">
         <Link href="/giris" className={linkClass}>
@@ -134,10 +138,10 @@ function MailSent({ local, turnstileSiteKey }: { local: string; turnstileSiteKey
   );
 }
 
-function ResendButton({ secondsLeft }: { secondsLeft: number }) {
+function ResendButton({ secondsLeft, waiting }: { secondsLeft: number; waiting: boolean }) {
   return (
-    <SubmitButton variant="outline" pendingLabel="Gönderiliyor…" disabled={secondsLeft > 0}>
-      {secondsLeft > 0 ? `Tekrar gönder (${secondsLeft} sn)` : "Tekrar gönder"}
+    <SubmitButton variant="outline" pendingLabel="Gönderiliyor…" disabled={secondsLeft > 0 || waiting}>
+      {secondsLeft > 0 ? `Tekrar gönder (${secondsLeft} sn)` : waiting ? "Doğrulanıyor…" : "Tekrar gönder"}
     </SubmitButton>
   );
 }

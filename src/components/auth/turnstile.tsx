@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { TURNSTILE_FIELD, TURNSTILE_SCRIPT_SRC } from "@/lib/turnstile";
 
@@ -34,38 +34,68 @@ function loadTurnstile(): Promise<TurnstileApi> {
   return scriptPromise;
 }
 
+const LOAD_ERROR = "Robot doğrulaması yüklenemedi. Reklam engelleyiciyi kapatıp sayfayı yenileyin.";
+
+/** Token readiness for a form: `waiting` is true while a widget is rendered but has no fresh token. */
+export function useTurnstileToken(siteKey: string) {
+  const [token, setToken] = useState("");
+  const onTokenChange = useCallback((value: string) => setToken(value), []);
+  return { onTokenChange, waiting: Boolean(siteKey) && !token };
+}
+
 type TurnstileProps = {
   siteKey: string;
-  /** Pass the latest action state; the widget is reset whenever it turns into a failure. */
-  resetSignal?: { ok: boolean } | null;
+  /** Pass the latest action state; the widget is reset and the token cleared whenever it changes. */
+  resetSignal?: object | null;
+  /** Called with the fresh token, or "" when it is cleared, expired or failed. */
+  onTokenChange?: (token: string) => void;
 };
 
-/** Invisible-first Cloudflare Turnstile widget. Writes its token into the `cf-turnstile-response` field. */
-export function Turnstile({ siteKey, resetSignal }: TurnstileProps) {
+/** Visible Cloudflare Turnstile widget. Writes its token into the `cf-turnstile-response` field. */
+export function Turnstile({ siteKey, resetSignal, onTokenChange }: TurnstileProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const widgetIdRef = useRef<string | null>(null);
+  const onTokenChangeRef = useRef(onTokenChange);
+  const [loadFailed, setLoadFailed] = useState(false);
+
+  useEffect(() => {
+    onTokenChangeRef.current = onTokenChange;
+  });
 
   useEffect(() => {
     if (!siteKey) return;
     let cancelled = false;
     const setToken = (value: string) => {
       if (inputRef.current) inputRef.current.value = value;
+      onTokenChangeRef.current?.(value);
     };
     loadTurnstile()
       .then((api) => {
         if (cancelled || !containerRef.current || widgetIdRef.current) return;
         widgetIdRef.current = api.render(containerRef.current, {
           sitekey: siteKey,
-          appearance: "interaction-only",
+          appearance: "always",
+          size: "flexible",
           language: "tr",
+          "refresh-expired": "auto",
           "response-field": false,
-          callback: (token: string) => setToken(token),
+          callback: (token: string) => {
+            setLoadFailed(false);
+            setToken(token);
+          },
           "expired-callback": () => setToken(""),
-          "error-callback": () => setToken(""),
+          "error-callback": () => {
+            setLoadFailed(true);
+            setToken("");
+          },
         });
       })
-      .catch(() => setToken(""));
+      .catch(() => {
+        if (cancelled) return;
+        setLoadFailed(true);
+        setToken("");
+      });
     return () => {
       cancelled = true;
       if (widgetIdRef.current && window.turnstile) window.turnstile.remove(widgetIdRef.current);
@@ -73,16 +103,23 @@ export function Turnstile({ siteKey, resetSignal }: TurnstileProps) {
     };
   }, [siteKey]);
 
+  // Tokens are single use: every new action state (success or failure) needs a fresh one.
   useEffect(() => {
-    if (!resetSignal || resetSignal.ok) return;
+    if (!resetSignal) return;
     if (inputRef.current) inputRef.current.value = "";
+    onTokenChangeRef.current?.("");
     if (widgetIdRef.current && window.turnstile) window.turnstile.reset(widgetIdRef.current);
   }, [resetSignal]);
 
   return (
     <>
       <input ref={inputRef} type="hidden" name={TURNSTILE_FIELD} defaultValue="" />
-      <div ref={containerRef} className="flex justify-center empty:hidden" />
+      <div ref={containerRef} className="w-full empty:hidden" />
+      {loadFailed ? (
+        <p role="alert" className="text-sm text-destructive">
+          {LOAD_ERROR}
+        </p>
+      ) : null}
     </>
   );
 }

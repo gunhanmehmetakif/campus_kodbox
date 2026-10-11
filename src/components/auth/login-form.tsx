@@ -14,7 +14,7 @@ import {
 } from "@/components/auth/form-parts";
 import { GoogleButton } from "@/components/auth/google-button";
 import { PasswordInput } from "@/components/auth/password-input";
-import { Turnstile } from "@/components/auth/turnstile";
+import { Turnstile, useTurnstileToken } from "@/components/auth/turnstile";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { loginAction } from "@/server/auth/actions";
@@ -36,6 +36,7 @@ export function LoginForm({ googleEnabled, turnstileSiteKey, next, oauthError }:
   const [state, formAction] = useActionState(loginAction, null);
   const formRef = useRef<HTMLFormElement>(null);
   useFocusOnError(formRef, state);
+  const captcha = useTurnstileToken(turnstileSiteKey);
   const passwordId = useId();
   const passwordErrorId = useId();
   const rememberId = useId();
@@ -69,8 +70,10 @@ export function LoginForm({ googleEnabled, turnstileSiteKey, next, oauthError }:
             Beni hatırla
           </Label>
         </div>
-        <Turnstile siteKey={turnstileSiteKey} resetSignal={state} />
-        <SubmitButton pendingLabel="Giriş yapılıyor…">Giriş yap</SubmitButton>
+        <Turnstile siteKey={turnstileSiteKey} resetSignal={state} onTokenChange={captcha.onTokenChange} />
+        <SubmitButton pendingLabel="Giriş yapılıyor…" disabled={captcha.waiting}>
+          {captcha.waiting ? "Doğrulanıyor…" : "Giriş yap"}
+        </SubmitButton>
       </form>
 
       {googleEnabled ? (

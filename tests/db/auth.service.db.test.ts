@@ -269,33 +269,48 @@ describe.skipIf(!available)("auth service (DB)", async () => {
 
   it("5 hatalı girişten sonra hesap kilitlenir (doğru şifre bile geçmez)", async () => {
     const { local } = await createStaff();
-    const attempt = (password: string) => service.authenticate({ kind: "staff", local, password, ip: ip() });
+    const attempt = (password: string) => service.authenticate({ kind: "staff", local, password });
 
-    for (let i = 0; i < 5; i++) expect(await attempt("yanlis-sifre1")).toEqual({ ok: false, reason: "invalid" });
+    const wrong = [];
+    for (let i = 0; i < 5; i++) wrong.push(await attempt("yanlis-sifre1"));
+    expect(wrong).toEqual([
+      { ok: false, reason: "invalid" },
+      { ok: false, reason: "invalid" },
+      { ok: false, reason: "invalid", attemptsLeft: 2 },
+      { ok: false, reason: "invalid", attemptsLeft: 1 },
+      { ok: false, reason: "invalid" },
+    ]);
     const locked = await attempt(PASSWORD);
     expect(locked.ok).toBe(false);
     if (!locked.ok) expect(locked.reason).toBe("locked");
   });
 
+  it("kalan hak sayacı olmayan hesapta da aynı şekilde işler", async () => {
+    const local = `yok${rnd().slice(0, 8)}`;
+    const results = [];
+    for (let i = 0; i < 4; i++) results.push(await service.authenticate({ kind: "staff", local, password: "yanlis-sifre1" }));
+    expect(results.map((r) => (r.ok || r.reason !== "invalid" ? null : (r.attemptsLeft ?? null)))).toEqual([null, null, 2, 1]);
+  });
+
   it("giriş: doğru şifre oturum bilgisi döner; yanlış şifre, olmayan ve devre dışı hesap aynı genel hatayı alır", async () => {
     const { local, user } = await createStaff();
-    const ok = await service.authenticate({ kind: "staff", local, password: PASSWORD, ip: ip() });
+    const ok = await service.authenticate({ kind: "staff", local, password: PASSWORD });
     expect(ok).toEqual({ ok: true, userId: user.id, role: "instructor", mustChangePassword: false });
 
-    const wrong = await service.authenticate({ kind: "staff", local, password: "yanlis1234", ip: ip() });
-    const missing = await service.authenticate({ kind: "staff", local: `yok${rnd().slice(0, 6)}`, password: PASSWORD, ip: ip() });
-    const foreign = await service.authenticate({ kind: "staff", local: "x@gmail.com", password: PASSWORD, ip: ip() });
+    const wrong = await service.authenticate({ kind: "staff", local, password: "yanlis1234" });
+    const missing = await service.authenticate({ kind: "staff", local: `yok${rnd().slice(0, 6)}`, password: PASSWORD });
+    const foreign = await service.authenticate({ kind: "staff", local: "x@gmail.com", password: PASSWORD });
     expect([wrong, missing, foreign]).toEqual(Array(3).fill({ ok: false, reason: "invalid" }));
 
     const disabled = await createStaff({ status: "disabled" });
-    expect(await service.authenticate({ kind: "staff", local: disabled.local, password: PASSWORD, ip: ip() })).toEqual({
+    expect(await service.authenticate({ kind: "staff", local: disabled.local, password: PASSWORD })).toEqual({
       ok: false,
       reason: "invalid",
     });
 
     // Pasting the full student email on the staff tab selects the right kind.
     const student = await createStudent();
-    const pasted = await service.authenticate({ kind: "staff", local: student.email, password: PASSWORD, ip: ip() });
+    const pasted = await service.authenticate({ kind: "staff", local: student.email, password: PASSWORD });
     expect(pasted.ok).toBe(true);
   });
 
@@ -322,8 +337,8 @@ describe.skipIf(!available)("auth service (DB)", async () => {
       ok: false,
       reason: "used",
     });
-    expect((await service.authenticate({ kind: "staff", local, password: newPassword, ip: ip() })).ok).toBe(true);
-    expect((await service.authenticate({ kind: "staff", local, password: PASSWORD, ip: ip() })).ok).toBe(false);
+    expect((await service.authenticate({ kind: "staff", local, password: newPassword })).ok).toBe(true);
+    expect((await service.authenticate({ kind: "staff", local, password: PASSWORD })).ok).toBe(false);
   });
 
   it("şifremi unuttum: olmayan ve devre dışı hesapta mail gitmez, sonuç yine 'sent'", async () => {
