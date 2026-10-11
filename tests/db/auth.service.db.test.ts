@@ -41,6 +41,7 @@ describe.skipIf(!available)("auth service (DB)", async () => {
   const { hashPassword } = await import("@/lib/server/password");
   const { getDefaultSchool } = await import("@/lib/server/schools");
   const service = await import("@/server/auth/service");
+  const { RATE_LIMITS } = await import("@/lib/server/rate-limit");
   const { users, sessions, courseRoster, courses, terms, emailTokens, oauthAccounts, schools } = schema;
 
   const createdUserIds: string[] = [];
@@ -196,9 +197,10 @@ describe.skipIf(!available)("auth service (DB)", async () => {
     expect(await service.requestRegistration({ local: "abc", ip: ip() })).toEqual({ status: "invalid_input" });
     const limitedIp = ip();
     const outcomes = [];
-    for (let i = 0; i < 11; i++) outcomes.push(await service.requestRegistration({ local: studentNo(), ip: limitedIp }));
-    expect(outcomes.slice(0, 10).every((o) => o.status === "sent")).toBe(true);
-    expect(outcomes[10]!.status).toBe("ip_limited");
+    const max = RATE_LIMITS.authRequestPerIp.limit;
+    for (let i = 0; i < max + 1; i++) outcomes.push(await service.requestRegistration({ local: studentNo(), ip: limitedIp }));
+    expect(outcomes.slice(0, max).every((o) => o.status === "sent")).toBe(true);
+    expect(outcomes[max]!.status).toBe("ip_limited");
   });
 
   it("tekrar gönderme 60 sn bekleme süresine tabidir", async () => {
@@ -278,11 +280,30 @@ describe.skipIf(!available)("auth service (DB)", async () => {
       { ok: false, reason: "invalid" },
       { ok: false, reason: "invalid", attemptsLeft: 2 },
       { ok: false, reason: "invalid", attemptsLeft: 1 },
-      { ok: false, reason: "invalid" },
+      expect.objectContaining({ ok: false, reason: "locked" }),
     ]);
+    const last = wrong[4];
+    if (last && !last.ok && last.reason === "locked") expect(last.retryAfter).toBeGreaterThan(0);
     const locked = await attempt(PASSWORD);
     expect(locked.ok).toBe(false);
     if (!locked.ok) expect(locked.reason).toBe("locked");
+  });
+
+  it("giriş IP bütçesi: yalnız başarısız denemeler sayılır, bütçe dolunca engellenir", async () => {
+    const loginIp = ip();
+    expect((await service.checkLoginIpBudget(loginIp)).limited).toBe(false);
+    for (let i = 0; i < RATE_LIMITS.loginPerIp.limit - 1; i++) await service.recordLoginIpFailure(loginIp);
+    expect((await service.checkLoginIpBudget(loginIp)).limited).toBe(false);
+    await service.recordLoginIpFailure(loginIp);
+    const limited = await service.checkLoginIpBudget(loginIp);
+    expect(limited.limited).toBe(true);
+    expect(limited.retryAfter).toBeGreaterThan(0);
+
+    // A successful login does not touch the IP budget.
+    const { local } = await createStaff();
+    const freshIp = ip();
+    expect((await service.authenticate({ kind: "staff", local, password: PASSWORD })).ok).toBe(true);
+    expect((await service.checkLoginIpBudget(freshIp)).count).toBe(0);
   });
 
   it("kalan hak sayacı olmayan hesapta da aynı şekilde işler", async () => {

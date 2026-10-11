@@ -22,11 +22,11 @@ export type RateLimitResult = { ok: boolean; remaining: number; retryAfter: numb
 export const RATE_LIMITS = {
   /** At most 3 mails per hour for the same identity (student no / staff email). */
   mailPerIdentity: { limit: 3, windowSec: 60 * 60 },
-  /** At most 10 register or reset requests per hour from the same IP. */
-  authRequestPerIp: { limit: 10, windowSec: 60 * 60 },
+  /** At most 20 register or reset requests per hour from the same IP (campus NAT shares one IP). */
+  authRequestPerIp: { limit: 20, windowSec: 60 * 60 },
   /** 5 failed logins on the same account lock it for the rest of a 15 minute window. */
   loginFailures: { limit: 5, windowSec: 15 * 60 },
-  /** Login attempts per IP (account scanning / brute force). */
+  /** Failed login attempts per IP (campus NAT shares one IP, so the budget is not tiny). */
   loginPerIp: { limit: 30, windowSec: 15 * 60 },
   /** "Resend" button: once per 60 seconds. */
   resendCooldown: { limit: 1, windowSec: 60 },

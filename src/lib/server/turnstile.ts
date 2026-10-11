@@ -45,8 +45,12 @@ export async function verifyTurnstile(
       cache: "no-store",
     });
     if (!res.ok) return failed([`http-${res.status}`]);
-    const data = (await res.json()) as { success: boolean; "error-codes"?: string[] };
-    return data.success ? { ok: true } : failed(data["error-codes"] ?? ["unknown"]);
+    const data = (await res.json()) as { success: boolean; hostname?: string; "error-codes"?: string[] };
+    if (!data.success) return failed(data["error-codes"] ?? ["unknown"]);
+    if (env.NODE_ENV === "production" && data.hostname !== new URL(env.APP_URL).hostname) {
+      return failed(["hostname-mismatch"]);
+    }
+    return { ok: true };
   } catch (error) {
     console.error("[turnstile] verification request failed", error);
     return failed(["network-error"]);
@@ -55,5 +59,6 @@ export async function verifyTurnstile(
 
 /** Site key for the client widget (pass from a server component as a prop). */
 export function getTurnstileSiteKey(): string {
-  return env.TURNSTILE_SITE_KEY;
+  // No widget in bypass mode: the server skips verification, so the client must not wait for a token.
+  return env.TURNSTILE_DEV_BYPASS ? "" : env.TURNSTILE_SITE_KEY;
 }

@@ -24,8 +24,9 @@ import {
 import {
   authenticate,
   changePassword,
-  consumeLoginIpBudget,
+  checkLoginIpBudget,
   completeRegistration,
+  recordLoginIpFailure,
   requestPasswordReset,
   requestRegistration,
   resetPassword,
@@ -76,7 +77,8 @@ function mailOutcomeToResult(outcome: MailRequestOutcome): ActionResult<Sent> {
     case "cooldown":
       return fail(`Yeni mail için ${Math.ceil(outcome.retryAfter)} sn bekleyin.`);
     case "invalid_input":
-      return fail("Geçerli bir öğrenci numarası girin.", { local: ["Geçerli bir öğrenci numarası girin."] });
+      // Form-level on purpose: the captcha token is already spent here, so the widget must reset.
+      return fail("Geçerli bir öğrenci numarası girin.");
   }
 }
 
@@ -88,11 +90,14 @@ export async function loginAction(_prev: Prev<void>, formData: FormData): Promis
     const parsed = loginSchema.safeParse(formToObject(formData));
     if (!parsed.success) return failFromZod(parsed.error);
 
-    // Count the IP first so captcha failures also use up the budget.
+    // Only failures count against the IP budget (campus NAT shares one IP); successes are free.
     const ip = await getClientIp();
-    const ipLimit = await consumeLoginIpBudget(ip);
-    if (!ipLimit.ok) return lockedError(ipLimit.retryAfter);
-    if (!(await verifyTurnstile(formData.get(TURNSTILE_FIELD), ip)).ok) return fail(CAPTCHA_ERROR);
+    const ipBudget = await checkLoginIpBudget(ip);
+    if (ipBudget.limited) return tooManyRequests(ipBudget.retryAfter);
+    if (!(await verifyTurnstile(formData.get(TURNSTILE_FIELD), ip)).ok) {
+      await recordLoginIpFailure(ip);
+      return fail(CAPTCHA_ERROR);
+    }
 
     const result = await authenticate({
       kind: parsed.data.kind,
@@ -101,6 +106,7 @@ export async function loginAction(_prev: Prev<void>, formData: FormData): Promis
     });
     if (!result.ok) {
       if (result.reason === "locked") return lockedError(result.retryAfter);
+      await recordLoginIpFailure(ip);
       return fail(result.attemptsLeft ? `${LOGIN_ERROR} ${result.attemptsLeft} deneme hakkınız kaldı.` : LOGIN_ERROR);
     }
 

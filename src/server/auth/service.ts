@@ -347,8 +347,13 @@ export type AuthenticateResult =
   | { ok: false; reason: "invalid"; attemptsLeft?: number }
   | { ok: false; reason: "locked"; retryAfter: number };
 
-/** Counts one login attempt for the IP (called by the action before the captcha check). */
-export function consumeLoginIpBudget(ip: string) {
+/** Checks the per-IP failed-login budget without counting (called by the action before the captcha). */
+export function checkLoginIpBudget(ip: string) {
+  return peek(rateLimitKey("login-ip", ip), RATE_LIMITS.loginPerIp);
+}
+
+/** Counts one failed login (bad captcha or bad credentials) against the IP. */
+export function recordLoginIpFailure(ip: string) {
   return consume(rateLimitKey("login-ip", ip), RATE_LIMITS.loginPerIp);
 }
 
@@ -378,9 +383,12 @@ export async function authenticate(input: {
 
   if (!user || !verified || user.status !== "active") {
     const { remaining } = await consume(failKey, RATE_LIMITS.loginFailures);
-    return remaining >= 1 && remaining <= 2
-      ? { ok: false, reason: "invalid", attemptsLeft: remaining }
-      : { ok: false, reason: "invalid" };
+    if (remaining === 0) {
+      // This failure reached the limit: show the lock message right away.
+      const { retryAfter } = await peek(failKey, RATE_LIMITS.loginFailures);
+      return { ok: false, reason: "locked", retryAfter };
+    }
+    return remaining <= 2 ? { ok: false, reason: "invalid", attemptsLeft: remaining } : { ok: false, reason: "invalid" };
   }
 
   await resetRateLimit(failKey);

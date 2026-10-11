@@ -46,7 +46,7 @@ export function useTurnstileToken(siteKey: string) {
 type TurnstileProps = {
   siteKey: string;
   /** Pass the latest action state; the widget is reset and the token cleared whenever it changes. */
-  resetSignal?: object | null;
+  resetSignal?: { ok: boolean; fieldErrors?: unknown } | null;
   /** Called with the fresh token, or "" when it is cleared, expired or failed. */
   onTokenChange?: (token: string) => void;
 };
@@ -58,6 +58,7 @@ export function Turnstile({ siteKey, resetSignal, onTokenChange }: TurnstileProp
   const widgetIdRef = useRef<string | null>(null);
   const onTokenChangeRef = useRef(onTokenChange);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
   useEffect(() => {
     onTokenChangeRef.current = onTokenChange;
@@ -81,12 +82,13 @@ export function Turnstile({ siteKey, resetSignal, onTokenChange }: TurnstileProp
           "refresh-expired": "auto",
           "response-field": false,
           callback: (token: string) => {
-            setLoadFailed(false);
+            setRetrying(false);
             setToken(token);
           },
           "expired-callback": () => setToken(""),
+          // Default behavior retries on its own; just tell the user.
           "error-callback": () => {
-            setLoadFailed(true);
+            setRetrying(true);
             setToken("");
           },
         });
@@ -103,9 +105,11 @@ export function Turnstile({ siteKey, resetSignal, onTokenChange }: TurnstileProp
     };
   }, [siteKey]);
 
-  // Tokens are single use: every new action state (success or failure) needs a fresh one.
+  // Tokens are single use: every new action state needs a fresh one. Field validation failures are
+  // returned before the server verifies the captcha, so the token is still valid there.
   useEffect(() => {
     if (!resetSignal) return;
+    if (!resetSignal.ok && resetSignal.fieldErrors) return;
     if (inputRef.current) inputRef.current.value = "";
     onTokenChangeRef.current?.("");
     if (widgetIdRef.current && window.turnstile) window.turnstile.reset(widgetIdRef.current);
@@ -118,6 +122,10 @@ export function Turnstile({ siteKey, resetSignal, onTokenChange }: TurnstileProp
       {loadFailed ? (
         <p role="alert" className="text-sm text-destructive">
           {LOAD_ERROR}
+        </p>
+      ) : retrying ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          Doğrulama tekrar deneniyor…
         </p>
       ) : null}
     </>
