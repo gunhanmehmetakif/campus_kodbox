@@ -40,6 +40,14 @@ const serverSchema = z.object({
   DATA_ENCRYPTION_KEY: base64Key32,
   BLIND_INDEX_KEY: base64Key32,
 
+  /** SMTP (e.g. Gmail). Takes priority over Resend when host, user and pass are all set. */
+  SMTP_HOST: optionalString,
+  SMTP_PORT: z.preprocess(
+    (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+    z.coerce.number().int().positive().default(587),
+  ),
+  SMTP_USER: optionalString,
+  SMTP_PASS: optionalString,
   RESEND_API_KEY: optionalString,
   MAIL_FROM: z.string().min(3).default("Kodbox Campus <no-reply@kodbox.local>"),
 

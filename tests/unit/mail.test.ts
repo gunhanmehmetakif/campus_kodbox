@@ -50,3 +50,74 @@ describe("sendMail production guard", () => {
     expect(await readdir(path.join(workDir, ".dev-mail"))).toHaveLength(1);
   });
 });
+
+describe("sendMail SMTP transport", () => {
+  const sendMailMock = vi.fn();
+  const resendSend = vi.fn();
+  const input = { to: "ogrenci@ogr.mku.edu.tr", subject: "Doğrulama", html: "<p>link</p>", text: "link" };
+
+  beforeEach(() => {
+    vi.resetModules();
+    sendMailMock.mockReset();
+    resendSend.mockReset();
+    vi.doMock("nodemailer", () => {
+      const createTransport = () => ({ sendMail: sendMailMock });
+      return { default: { createTransport }, createTransport };
+    });
+    vi.doMock("resend", () => ({
+      Resend: class {
+        emails = { send: resendSend };
+      },
+    }));
+    vi.stubEnv("SMTP_HOST", "smtp.example.test");
+    vi.stubEnv("SMTP_USER", "user@example.test");
+    vi.stubEnv("SMTP_PASS", "secret-pass");
+    vi.stubEnv("MAIL_FROM", "Kodbox <no-reply@example.test>");
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    __resetEnvCacheForTests();
+  });
+
+  afterEach(() => {
+    vi.doUnmock("nodemailer");
+    vi.doUnmock("resend");
+    vi.unstubAllEnvs();
+    __resetEnvCacheForTests();
+  });
+
+  it("sends through the SMTP transporter", async () => {
+    sendMailMock.mockResolvedValue({ messageId: "<abc@example.test>" });
+    const { sendMail } = await import("@/lib/server/mail");
+
+    const result = await sendMail(input);
+
+    expect(result).toEqual({ ok: true, id: "<abc@example.test>" });
+    expect(sendMailMock).toHaveBeenCalledWith({
+      from: "Kodbox <no-reply@example.test>",
+      to: input.to,
+      subject: input.subject,
+      html: input.html,
+      text: input.text,
+    });
+  });
+
+  it("returns ok:false when SMTP sending throws", async () => {
+    sendMailMock.mockRejectedValue(Object.assign(new Error("connection refused"), { code: "ECONNECTION" }));
+    const { sendMail } = await import("@/lib/server/mail");
+
+    const result = await sendMail(input);
+
+    expect(result).toEqual({ ok: false, error: "Mail gönderilemedi." });
+  });
+
+  it("prefers SMTP over Resend when both are configured", async () => {
+    vi.stubEnv("RESEND_API_KEY", "re_test");
+    __resetEnvCacheForTests();
+    sendMailMock.mockResolvedValue({ messageId: "<id>" });
+    const { sendMail } = await import("@/lib/server/mail");
+
+    await sendMail(input);
+
+    expect(sendMailMock).toHaveBeenCalledTimes(1);
+    expect(resendSend).not.toHaveBeenCalled();
+  });
+});

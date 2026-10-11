@@ -3,6 +3,7 @@ import "server-only";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import nodemailer, { type Transporter } from "nodemailer";
 import { Resend } from "resend";
 
 import { env } from "@/lib/env";
@@ -11,10 +12,11 @@ import { env } from "@/lib/env";
  * Mail sending. The system only sends verification and password reset mails (PRD 2.6);
  * everything else is an in-app notification.
  *
- * - With RESEND_API_KEY: sends through Resend.
- * - Without it (local dev): nothing is sent; a summary is logged and the full HTML is written
+ * - With SMTP_HOST, SMTP_USER and SMTP_PASS: sends over SMTP (nodemailer, e.g. Gmail). Highest priority.
+ * - Else with RESEND_API_KEY: sends through Resend.
+ * - Else (local dev): nothing is sent; a summary is logged and the full HTML is written
  *   to `.dev-mail/` so you can open it in a browser and click the link.
- * - In production a missing key is an error.
+ * - In production, no configured transport is an error.
  *
  * Mail templates are added in F1 (verify / reset).
  *
@@ -31,13 +33,45 @@ export type SendMailInput = {
 export type SendMailResult = { ok: true; id: string | null } | { ok: false; error: string };
 
 let resendClient: Resend | undefined;
+let smtpTransport: Transporter | undefined;
 
 export const DEV_MAIL_DIR = path.join(process.cwd(), ".dev-mail");
 
+async function sendViaSmtp(
+  input: SendMailInput,
+  config: { host: string; user: string; pass: string },
+): Promise<SendMailResult> {
+  smtpTransport ??= nodemailer.createTransport({
+    host: config.host,
+    port: env.SMTP_PORT,
+    secure: env.SMTP_PORT === 465,
+    auth: { user: config.user, pass: config.pass },
+  });
+  try {
+    const info = await smtpTransport.sendMail({
+      from: env.MAIL_FROM,
+      to: input.to,
+      subject: input.subject,
+      html: input.html,
+      text: input.text,
+    });
+    return { ok: true, id: info.messageId ?? null };
+  } catch (error) {
+    // Log only message/code, never the transport config (credentials).
+    const e = error as { message?: string; code?: string };
+    console.error("[mail] SMTP error", { code: e.code, message: e.message });
+    return { ok: false, error: "Mail gönderilemedi." };
+  }
+}
+
 export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
+  if (env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS) {
+    return sendViaSmtp(input, { host: env.SMTP_HOST, user: env.SMTP_USER, pass: env.SMTP_PASS });
+  }
+
   if (!env.RESEND_API_KEY) {
     if (env.NODE_ENV === "production") {
-      console.error("[mail] RESEND_API_KEY is not set; cannot send mail in production.");
+      console.error("[mail] Neither SMTP nor RESEND_API_KEY is configured; cannot send mail in production.");
       return { ok: false, error: "Mail servisi yapılandırılmamış." };
     }
     return writeDevMail(input);
@@ -90,7 +124,7 @@ async function writeDevMail(input: SendMailInput): Promise<SendMailResult> {
   console.info(
     [
       "",
-      "[mail:dev] Mail not sent (no RESEND_API_KEY)",
+      "[mail:dev] Mail not sent (no SMTP or RESEND_API_KEY)",
       `  To     : ${input.to}`,
       `  Subject: ${input.subject}`,
       `  File   : ${path.relative(process.cwd(), file)}`,
