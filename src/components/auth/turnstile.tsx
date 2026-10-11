@@ -43,10 +43,16 @@ export function useTurnstileToken(siteKey: string) {
   return { onTokenChange, waiting: Boolean(siteKey) && !token };
 }
 
+type ResetSignal = { ok: boolean; fieldErrors?: unknown } | null | undefined;
+
+function needsReset(signal: ResetSignal): boolean {
+  return Boolean(signal) && !(signal?.ok === false && signal.fieldErrors);
+}
+
 type TurnstileProps = {
   siteKey: string;
   /** Pass the latest action state; the widget is reset and the token cleared whenever it changes. */
-  resetSignal?: { ok: boolean; fieldErrors?: unknown } | null;
+  resetSignal?: ResetSignal;
   /** Called with the fresh token, or "" when it is cleared, expired or failed. */
   onTokenChange?: (token: string) => void;
 };
@@ -54,11 +60,12 @@ type TurnstileProps = {
 /** Visible Cloudflare Turnstile widget. Writes its token into the `cf-turnstile-response` field. */
 export function Turnstile({ siteKey, resetSignal, onTokenChange }: TurnstileProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
   const widgetIdRef = useRef<string | null>(null);
   const onTokenChangeRef = useRef(onTokenChange);
   const [loadFailed, setLoadFailed] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  // Controlled on purpose: an uncontrolled field is wiped by re-renders and React's post-action form reset.
+  const [token, setTokenState] = useState("");
 
   useEffect(() => {
     onTokenChangeRef.current = onTokenChange;
@@ -68,7 +75,7 @@ export function Turnstile({ siteKey, resetSignal, onTokenChange }: TurnstileProp
     if (!siteKey) return;
     let cancelled = false;
     const setToken = (value: string) => {
-      if (inputRef.current) inputRef.current.value = value;
+      setTokenState(value);
       onTokenChangeRef.current?.(value);
     };
     loadTurnstile()
@@ -107,17 +114,21 @@ export function Turnstile({ siteKey, resetSignal, onTokenChange }: TurnstileProp
 
   // Tokens are single use: every new action state needs a fresh one. Field validation failures are
   // returned before the server verifies the captcha, so the token is still valid there.
+  const [seenSignal, setSeenSignal] = useState(resetSignal);
+  if (seenSignal !== resetSignal) {
+    setSeenSignal(resetSignal);
+    if (needsReset(resetSignal)) setTokenState("");
+  }
+
   useEffect(() => {
-    if (!resetSignal) return;
-    if (!resetSignal.ok && resetSignal.fieldErrors) return;
-    if (inputRef.current) inputRef.current.value = "";
+    if (!needsReset(resetSignal)) return;
     onTokenChangeRef.current?.("");
     if (widgetIdRef.current && window.turnstile) window.turnstile.reset(widgetIdRef.current);
   }, [resetSignal]);
 
   return (
     <>
-      <input ref={inputRef} type="hidden" name={TURNSTILE_FIELD} defaultValue="" />
+      <input type="hidden" name={TURNSTILE_FIELD} value={token} readOnly />
       <div ref={containerRef} className="w-full empty:hidden" />
       {loadFailed ? (
         <p role="alert" className="text-sm text-destructive">
