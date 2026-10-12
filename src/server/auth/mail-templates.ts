@@ -23,17 +23,45 @@ function escapeHtml(value: string): string {
 function layout(input: { title: string; intro: string; cta: string; url: string; validity: string }): string {
   const appName = escapeHtml(env.NEXT_PUBLIC_APP_NAME);
   const url = escapeHtml(input.url);
+  const logoUrl = escapeHtml(`${env.APP_URL}/icons/mail-logo.png`);
+  const title = escapeHtml(input.title);
+  const intro = escapeHtml(input.intro);
+  const sans = "-apple-system,'Segoe UI',Helvetica,Arial,sans-serif";
+  const serif = "Georgia,'Times New Roman',serif";
+  const mono = "'SFMono-Regular',Menlo,Consolas,monospace";
   return `<!doctype html>
 <html lang="tr">
-<body style="margin:0;padding:24px;background:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1f2933;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:12px;padding:32px;">
-    <tr><td>
-      <p style="margin:0 0 16px;font-size:14px;font-weight:600;color:#52606d;">${appName}</p>
-      <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;">${escapeHtml(input.title)}</h1>
-      <p style="margin:0 0 24px;font-size:15px;line-height:1.6;">${escapeHtml(input.intro)}</p>
-      <p style="margin:0 0 24px;"><a href="${url}" style="display:inline-block;padding:12px 20px;background:#1f2933;color:#ffffff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600;">${escapeHtml(input.cta)}</a></p>
-      <p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:#52606d;">Buton çalışmazsa bu adresi tarayıcınıza yapıştırın:<br><a href="${url}" style="color:#52606d;word-break:break-all;">${url}</a></p>
-      <p style="margin:16px 0 0;font-size:13px;line-height:1.6;color:#52606d;">${escapeHtml(input.validity)} ${escapeHtml(IGNORE_NOTE)}</p>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>${title}</title>
+</head>
+<body style="margin:0;padding:0;background:#faf8f3;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${intro}</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#faf8f3;">
+    <tr><td align="center" style="padding:32px 16px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;margin:0 auto;">
+        <tr><td style="padding:0 0 20px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+            <td style="vertical-align:middle;padding:0 12px 0 0;"><img src="${logoUrl}" width="40" height="40" alt="" style="display:block;border:0;border-radius:9px"></td>
+            <td style="vertical-align:middle;"><span style="font-family:${serif};font-size:24px;font-weight:600;color:#1f2433;letter-spacing:-0.02em;">kodbox</span> <span style="font-family:${mono};font-size:11px;letter-spacing:0.18em;color:#5a5f73;">CAMPUS</span></td>
+          </tr></table>
+        </td></tr>
+        <tr><td style="background:#ffffff;border:1px solid #e6e1d6;border-top:4px solid #e3a948;border-radius:16px;padding:36px 32px;">
+          <h1 style="margin:0 0 14px;font-family:${serif};font-size:26px;line-height:1.25;font-weight:600;color:#1f2433;">${title}</h1>
+          <p style="margin:0 0 28px;font-family:${sans};font-size:16px;line-height:1.6;color:#3d4256;">${intro}</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 28px;"><tr>
+            <td bgcolor="#2b3a67" style="background:#2b3a67;border-radius:10px;"><a href="${url}" style="display:inline-block;padding:14px 24px;font-family:${sans};font-size:16px;line-height:20px;font-weight:600;color:#faf8f3;text-decoration:none;border-radius:10px;">${escapeHtml(input.cta)}</a></td>
+          </tr></table>
+          <div style="border-top:1px solid #eee9de;padding-top:20px;">
+            <p style="margin:0 0 12px;font-family:${sans};font-size:13px;line-height:1.6;color:#5a5f73;">Buton çalışmazsa bu adresi tarayıcınıza yapıştırın:<br><a href="${url}" style="color:#5a5f73;word-break:break-all;">${url}</a></p>
+            <p style="margin:0;font-family:${sans};font-size:13px;line-height:1.6;color:#5a5f73;">${escapeHtml(input.validity)} ${escapeHtml(IGNORE_NOTE)}</p>
+          </div>
+        </td></tr>
+        <tr><td align="center" style="padding:20px 0 0;font-family:${sans};font-size:12px;line-height:1.5;color:#7a7f90;">${appName} · Bu mail otomatik gönderildi, yanıtlamanıza gerek yok.</td></tr>
+      </table>
     </td></tr>
   </table>
 </body>
