@@ -1,6 +1,7 @@
 import {
   Bell,
   BookOpen,
+  ClipboardList,
   GraduationCap,
   History,
   LayoutDashboard,
@@ -28,6 +29,7 @@ const account: NavItem = { href: "/hesap", label: "Hesap", icon: UserCog, primar
 export const NAV_ITEMS: Record<Role, NavItem[]> = {
   student: [
     { href: "/ogrenci", label: "Panel", icon: LayoutDashboard, exact: true, primary: true },
+    { href: "/ogrenci/odevlerim", label: "Ödevlerim", icon: ClipboardList, primary: true },
     bell,
     account,
   ],

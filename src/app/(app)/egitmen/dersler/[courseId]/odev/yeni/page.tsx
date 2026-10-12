@@ -29,7 +29,7 @@ async function NewAssignment({ params }: Pick<Props, "params">) {
   const { courseId } = await params;
   if (!isUuid(courseId)) notFound();
   const course = await getMyCourse(courseId);
-  const back = `/egitmen/dersler/${course.id}?sekme=odevler`;
+  const back = `/egitmen/dersler/${course.id}?filtre=odev`;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">

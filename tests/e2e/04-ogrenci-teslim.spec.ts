@@ -2,7 +2,7 @@ import { MOBILE } from "./support/env";
 import { expect, expectNoHorizontalScroll, login, newContext, test, visit } from "./support/helpers";
 import { loadState } from "./support/state";
 
-/** Flow 4: students see the unread badge, open the assignment from the notification and submit a Drive link. */
+/** Flow 4: students open the assignment from the notification (redirect to the feed card) and submit a Drive link in the dialog. */
 test.use(MOBILE);
 test.describe.configure({ mode: "serial" });
 
@@ -21,14 +21,18 @@ test("öğrenci A bildirimden ödeve gider ve teslim eder", async ({ page }) => 
   await page.waitForURL(/\/bildirimler/);
 
   await page.getByRole("button", { name: /Yeni ödev/ }).click();
-  await page.waitForURL(/\/ogrenci\/odevler\//);
-  await expect(page.getByRole("heading", { name: "Teslim" })).toBeVisible();
+  // The legacy /ogrenci/odevler/<id> link redirects to the feed card, which opens the submission dialog.
+  await page.waitForURL(/\/ogrenci\/dersler\/[^?]+\?odev=/);
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("heading", { name: "Teslim" })).toBeVisible();
 
   // Enter submits without blurring the field, so the Drive reachability check (an outbound request) never fires.
-  const linkField = page.locator("input[inputmode=url]:visible");
+  const linkField = dialog.locator("input[inputmode=url]:visible");
   await linkField.fill(driveLink());
   await linkField.press("Enter");
-  await expect(page.getByText("Teslim edildi").first()).toBeVisible();
+  await expect(page.getByText("Teslim edildi.", { exact: true })).toBeVisible();
+  await expect(dialog).toBeHidden();
   await expectNoHorizontalScroll(page);
 
   // The submitted assignment leaves the dashboard's upcoming list ...
@@ -36,10 +40,16 @@ test("öğrenci A bildirimden ödeve gider ve teslim eder", async ({ page }) => 
   await expect(page.getByRole("heading", { name: "Derslerim" })).toBeVisible();
   await expect(page.getByRole("link", { name: /E2E ödevi/ })).toHaveCount(0);
 
-  // ... and shows up under "Teslim edilen" in the course.
-  await visit(page, `/ogrenci/dersler/${courseId}?sekme=odevler`);
-  await page.getByRole("link", { name: "Teslim edilen" }).click();
-  await expect(page.getByRole("link", { name: /E2E ödevi/ })).toBeVisible();
+  // ... and shows up under "Teslim edilen" in the course's assignment filter ...
+  await visit(page, `/ogrenci/dersler/${courseId}?filtre=odev`);
+  await expect(page.getByRole("region", { name: "Teslim edilen" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "E2E ödevi" })).toBeVisible();
+  await expectNoHorizontalScroll(page);
+
+  // ... and on the "Ödevlerim" page.
+  await visit(page, "/ogrenci/odevlerim");
+  await expect(page.getByRole("heading", { name: "Ödevlerim" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Teslim edilen" }).getByRole("heading", { name: "E2E ödevi" })).toBeVisible();
   await expectNoHorizontalScroll(page);
 });
 
@@ -51,10 +61,14 @@ test("öğrenci B ödevi teslim eder", async ({ browser }) => {
   try {
     await login(page, { kind: "student", local: student.no, password: student.password }, /\/ogrenci|\/hesap/);
     await visit(page, `/ogrenci/odevler/${assignmentId}`);
-    const linkField = page.locator("input[inputmode=url]:visible");
+    await page.waitForURL(/\/ogrenci\/dersler\/[^?]+\?odev=/);
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    const linkField = dialog.locator("input[inputmode=url]:visible");
     await linkField.fill(driveLink());
     await linkField.press("Enter");
-    await expect(page.getByText("Teslim edildi").first()).toBeVisible();
+    await expect(page.getByText("Teslim edildi.", { exact: true })).toBeVisible();
+    await expect(dialog).toBeHidden();
     await expectNoHorizontalScroll(page);
   } finally {
     await context.close();

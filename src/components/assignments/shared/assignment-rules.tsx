@@ -62,10 +62,23 @@ function formatLateUntil(d: Date): string {
   return `${p.day} ${p.month} ${p.hour}:${p.minute}'${dativeSuffix(spoken)}`;
 }
 
-function penaltyText(a: AssignmentRulesData): string | null {
+export function penaltyText(a: AssignmentRulesData): string | null {
   if (a.latePenaltyType === "none" || a.latePenaltyValue === null) return null;
   const value = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 }).format(a.latePenaltyValue);
   return a.latePenaltyType === "percent" ? `−%${value}` : `−${value} puan`;
+}
+
+/** One-line rules summary for feed cards (the due date is shown separately). */
+export function AssignmentRulesLine({ a }: { a: AssignmentRulesData }) {
+  const penalty = penaltyText(a);
+  const parts = [
+    a.maxScore !== null ? `${a.maxScore} puan` : "Puanlanmaz",
+    a.lateAllowed
+      ? `Geç teslim: ${[a.lateUntil ? `${formatLateUntil(a.lateUntil)} kadar` : "süresiz", penalty].filter(Boolean).join(", ")}`
+      : "Geç teslim yok",
+    ...(a.submissionType === "none" ? [] : [a.allowAnyLink ? "Her link" : "Google Drive linki"]),
+  ];
+  return <p className="text-xs text-muted-foreground">{parts.join(" · ")}</p>;
 }
 
 /** Row-by-row rules summary shared by the student and instructor assignment pages. */

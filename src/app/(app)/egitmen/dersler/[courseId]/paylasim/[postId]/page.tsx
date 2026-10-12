@@ -30,8 +30,7 @@ async function EditPost({ params }: Pick<Props, "params">) {
   const [course, post] = await Promise.all([getMyCourse(courseId), getCoursePost(postId)]);
   if (post.courseId !== course.id) notFound();
 
-  const tab = post.type === "material" ? "materyaller" : "akis";
-  const back = `/egitmen/dersler/${course.id}?sekme=${tab}`;
+  const back = `/egitmen/dersler/${course.id}?filtre=${post.type === "material" ? "materyal" : "duyuru"}`;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">

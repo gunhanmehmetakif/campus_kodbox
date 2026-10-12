@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 
 import { db } from "@/db";
-import { submissions } from "@/db/schema";
+import { assignments, submissions } from "@/db/schema";
 import { fail, failFromZod, failUnexpected, ok, type ActionResult } from "@/lib/action";
 import { requireRole } from "@/lib/auth";
 import { routes } from "@/lib/routes";
@@ -48,6 +48,10 @@ function toFailure(error: unknown) {
 
 function revalidateCourse(courseId: string) {
   revalidatePath(`/egitmen/dersler/${courseId}`, "layout");
+  revalidatePath(routes.instructor.home);
+}
+
+function revalidateInstructorPanel() {
   revalidatePath(routes.instructor.home);
 }
 
@@ -103,6 +107,7 @@ export async function gradeSubmissionAction(
       .where(eq(submissions.id, parsed.data.submissionId))
       .limit(1);
     if (row) revalidateAssignment(row.assignmentId);
+    revalidateInstructorPanel();
     return ok(result);
   } catch (error) {
     return toFailure(error);
@@ -119,6 +124,7 @@ export async function publishScoresAction(
     if (!parsed.success) return failFromZod(parsed.error);
     const result = await publishScores(user, parsed.data);
     revalidateAssignment(parsed.data.assignmentId);
+    revalidateInstructorPanel();
     return ok(result);
   } catch (error) {
     return toFailure(error);
@@ -135,6 +141,14 @@ export async function submitAssignmentAction(
     if (!parsed.success) return failFromZod(parsed.error, "Geçerli bir bağlantı girin.");
     const result = await submitAssignment(user, parsed.data);
     revalidateAssignment(parsed.data.assignmentId);
+    const [row] = await db
+      .select({ courseId: assignments.courseId })
+      .from(assignments)
+      .where(eq(assignments.id, parsed.data.assignmentId))
+      .limit(1);
+    if (row) revalidatePath(`/ogrenci/dersler/${row.courseId}`);
+    revalidatePath("/ogrenci/odevlerim");
+    revalidatePath(routes.student.home);
     return ok(result);
   } catch (error) {
     return toFailure(error);

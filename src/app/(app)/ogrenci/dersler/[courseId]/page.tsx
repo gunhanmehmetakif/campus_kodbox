@@ -6,13 +6,8 @@ import { Suspense } from "react";
 import { PageHeader } from "@/components/common/page-header";
 import { PageSkeleton } from "@/components/common/page-skeleton";
 import { first, isUuid } from "@/components/courses/utils";
-import { AssignmentsTab } from "@/components/student/assignments-tab";
-import {
-  StudentCourseTabs,
-  parseAssignmentFilter,
-  parseStudentTab,
-} from "@/components/student/course-tabs";
-import { FeedTab } from "@/components/student/feed-tab";
+import { CourseFeed } from "@/components/student/course-feed";
+import { FeedFilterChips, parseFeedFilter } from "@/components/student/feed-filters";
 import { getStudentCourse } from "@/server/student/queries";
 
 export const metadata: Metadata = { title: "Ders" };
@@ -36,12 +31,13 @@ async function CourseContent({
   if (!isUuid(courseId)) notFound();
 
   const course = await getStudentCourse(courseId);
-  const tab = parseStudentTab(first(query.sekme));
-  const filter = parseAssignmentFilter(first(query.filtre));
+  const filter = parseFeedFilter(first(query.filtre), first(query.sekme));
   const page = Math.max(1, Number.parseInt(first(query.sayfa) ?? "1", 10) || 1);
+  const odevParam = first(query.odev);
+  const odev = odevParam && isUuid(odevParam) ? odevParam : undefined;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={`${course.code} · ${course.name}`}
         description={[course.instructorName, course.termName].filter(Boolean).join(" · ")}
@@ -57,14 +53,10 @@ async function CourseContent({
       ) : null}
       {course.description ? <p className="max-w-prose text-sm text-muted-foreground">{course.description}</p> : null}
 
-      <StudentCourseTabs courseId={course.id} active={tab} />
+      <FeedFilterChips courseId={course.id} active={filter} />
 
-      <Suspense key={`${tab}|${page}|${filter}`} fallback={<PageSkeleton variant="list" />}>
-        {tab === "odevler" ? (
-          <AssignmentsTab courseId={course.id} filter={filter} />
-        ) : (
-          <FeedTab courseId={course.id} tab={tab} page={page} />
-        )}
+      <Suspense key={`${filter}|${page}|${odev ?? ""}`} fallback={<PageSkeleton variant="list" />}>
+        <CourseFeed courseId={course.id} filter={filter} page={page} odev={odev} />
       </Suspense>
     </div>
   );

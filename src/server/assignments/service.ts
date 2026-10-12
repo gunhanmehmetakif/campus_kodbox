@@ -10,6 +10,7 @@ import {
   submissionHistory,
   submissions,
   users,
+  type Assignment,
   type Course,
   type LinkItem,
 } from "@/db/schema";
@@ -276,6 +277,7 @@ export type AssignmentSummary = {
   lateAllowed: boolean;
   lateUntil: Date | null;
   maxScore: number | null;
+  publishedAt: Date | null;
   counts: { roster: number; submitted: number; late: number; graded: number; published: number };
 };
 
@@ -285,7 +287,6 @@ export type AssignmentDetail = AssignmentSummary & {
   allowAnyLink: boolean;
   latePenaltyType: "none" | "points" | "percent";
   latePenaltyValue: number | null;
-  publishedAt: Date | null;
   course: { id: string; code: string; name: string; archivedAt: Date | null };
 };
 
@@ -302,6 +303,7 @@ const summaryColumns = {
   lateAllowed: assignments.lateAllowed,
   lateUntil: assignments.lateUntil,
   maxScore: assignments.maxScore,
+  publishedAt: assignments.publishedAt,
   roster: sql<number>`(select count(*)::int from ${courseRoster} where ${courseRoster.courseId} = "assignments"."course_id")`,
   submitted: countSql(sql``),
   late: countSql(sql`and ${submissions.isLate}`),
@@ -318,6 +320,7 @@ type SummaryRow = {
   lateAllowed: boolean;
   lateUntil: Date | null;
   maxScore: number | null;
+  publishedAt: Date | null;
   roster: number;
   submitted: number;
   late: number;
@@ -335,6 +338,7 @@ function toSummary(r: SummaryRow): AssignmentSummary {
     lateAllowed: r.lateAllowed,
     lateUntil: r.lateUntil,
     maxScore: r.maxScore,
+    publishedAt: r.publishedAt,
     counts: { roster: r.roster, submitted: r.submitted, late: r.late, graded: r.graded, published: r.published },
   };
 }
@@ -347,6 +351,58 @@ export async function listAssignmentSummaries(courseId: string): Promise<Assignm
     // drafts first (enum order), then nearest deadline, no deadline last
     .orderBy(asc(assignments.status), sql`${assignments.dueAt} asc nulls last`, desc(assignments.createdAt));
   return rows.map(toSummary);
+}
+
+export type PendingGradingItem = {
+  assignmentId: string;
+  title: string;
+  course: { id: string; code: string; name: string };
+  dueAt: Date | null;
+  ungraded: number;
+  unpublished: number;
+};
+
+const PENDING_GRADING_LIMIT = 50;
+
+/** Published, scored, link-type assignments of the instructor's active courses that still need grading or publishing. */
+export async function listPendingGradingItems(instructorId: string): Promise<PendingGradingItem[]> {
+  const ungraded = sql<number>`count(*) filter (where ${submissions.id} is not null and ${submissions.score} is null)::int`;
+  const unpublished = sql<number>`count(*) filter (where ${submissions.score} is not null and ${submissions.scorePublishedAt} is null)::int`;
+  const rows = await db
+    .select({
+      assignmentId: assignments.id,
+      title: assignments.title,
+      courseId: courses.id,
+      courseCode: courses.code,
+      courseName: courses.name,
+      dueAt: assignments.dueAt,
+      ungraded,
+      unpublished,
+    })
+    .from(assignments)
+    .innerJoin(courses, eq(courses.id, assignments.courseId))
+    .leftJoin(submissions, eq(submissions.assignmentId, assignments.id))
+    .where(
+      and(
+        eq(courses.instructorId, instructorId),
+        isNull(courses.archivedAt),
+        eq(assignments.status, "published"),
+        eq(assignments.submissionType, "link"),
+        isNotNull(assignments.maxScore),
+      ),
+    )
+    .groupBy(assignments.id, courses.id)
+    .having(sql`${ungraded} > 0 or ${unpublished} > 0`)
+    .orderBy(desc(ungraded), sql`${assignments.dueAt} asc nulls last`, asc(assignments.id))
+    .limit(PENDING_GRADING_LIMIT);
+  return rows.map((r) => ({
+    assignmentId: r.assignmentId,
+    title: r.title,
+    course: { id: r.courseId, code: r.courseCode, name: r.courseName },
+    dueAt: r.dueAt,
+    ungraded: r.ungraded,
+    unpublished: r.unpublished,
+  }));
 }
 
 export async function getAssignmentDetail(assignmentId: string, instructorId: string): Promise<AssignmentDetail | null> {
@@ -596,6 +652,89 @@ async function findStudentAssignment(assignmentId: string, studentId: string, ex
   return row ?? null;
 }
 
+type StudentAssignmentRow = { assignment: Assignment; course: Course };
+
+/**
+ * Builds student views for many assignments with two queries (submissions, history),
+ * independent of how many assignments are passed. Output keeps the input order.
+ */
+export async function buildStudentAssignmentViews(
+  rows: StudentAssignmentRow[],
+  studentId: string,
+  now: Date,
+  executor: DbOrTx = db,
+): Promise<StudentAssignmentView[]> {
+  if (rows.length === 0) return [];
+  const subs = await executor
+    .select()
+    .from(submissions)
+    .where(
+      and(
+        eq(submissions.studentId, studentId),
+        inArray(
+          submissions.assignmentId,
+          rows.map((r) => r.assignment.id),
+        ),
+      ),
+    );
+  const subByAssignment = new Map(subs.map((s) => [s.assignmentId, s]));
+
+  const historyBySubmission = new Map<string, Array<{ url: string; submittedAt: Date; isLate: boolean }>>();
+  if (subs.length > 0) {
+    const historyRows = await executor
+      .select({
+        submissionId: submissionHistory.submissionId,
+        url: submissionHistory.url,
+        submittedAt: submissionHistory.submittedAt,
+        isLate: submissionHistory.isLate,
+      })
+      .from(submissionHistory)
+      .where(
+        inArray(
+          submissionHistory.submissionId,
+          subs.map((s) => s.id),
+        ),
+      )
+      .orderBy(desc(submissionHistory.submittedAt));
+    for (const h of historyRows) {
+      const list = historyBySubmission.get(h.submissionId) ?? [];
+      list.push({ url: h.url, submittedAt: h.submittedAt, isLate: h.isLate });
+      historyBySubmission.set(h.submissionId, list);
+    }
+  }
+
+  return rows.map(({ assignment: a, course }) => {
+    const sub = subByAssignment.get(a.id);
+    return {
+      id: a.id,
+      title: a.title,
+      bodyMd: a.bodyMd,
+      links: a.links,
+      submissionType: a.submissionType,
+      allowAnyLink: a.allowAnyLink,
+      dueAt: a.dueAt,
+      lateAllowed: a.lateAllowed,
+      lateUntil: a.lateUntil,
+      latePenaltyType: a.latePenaltyType,
+      latePenaltyValue: a.latePenaltyValue,
+      maxScore: a.maxScore,
+      course: { id: course.id, code: course.code, name: course.name, archived: course.archivedAt !== null },
+      window: getSubmissionWindow(a, now, course.archivedAt !== null),
+      submission: sub
+        ? {
+            url: sub.url,
+            submittedAt: sub.submittedAt,
+            isLate: sub.isLate,
+            history: historyBySubmission.get(sub.id) ?? [],
+            result: sub.scorePublishedAt
+              ? { score: sub.score, maxScore: a.maxScore, feedback: sub.feedback }
+              : null,
+          }
+        : null,
+    };
+  });
+}
+
 export async function getStudentAssignmentView(
   assignmentId: string,
   studentId: string,
@@ -603,52 +742,8 @@ export async function getStudentAssignmentView(
 ): Promise<StudentAssignmentView | null> {
   const found = await findStudentAssignment(assignmentId, studentId);
   if (!found) return null;
-  const { assignment: a, course } = found;
-
-  const [sub] = await db
-    .select()
-    .from(submissions)
-    .where(and(eq(submissions.assignmentId, a.id), eq(submissions.studentId, studentId)))
-    .limit(1);
-  const history = sub
-    ? await db
-        .select({
-          url: submissionHistory.url,
-          submittedAt: submissionHistory.submittedAt,
-          isLate: submissionHistory.isLate,
-        })
-        .from(submissionHistory)
-        .where(eq(submissionHistory.submissionId, sub.id))
-        .orderBy(desc(submissionHistory.submittedAt))
-    : [];
-
-  return {
-    id: a.id,
-    title: a.title,
-    bodyMd: a.bodyMd,
-    links: a.links,
-    submissionType: a.submissionType,
-    allowAnyLink: a.allowAnyLink,
-    dueAt: a.dueAt,
-    lateAllowed: a.lateAllowed,
-    lateUntil: a.lateUntil,
-    latePenaltyType: a.latePenaltyType,
-    latePenaltyValue: a.latePenaltyValue,
-    maxScore: a.maxScore,
-    course: { id: course.id, code: course.code, name: course.name, archived: course.archivedAt !== null },
-    window: getSubmissionWindow(a, now, course.archivedAt !== null),
-    submission: sub
-      ? {
-          url: sub.url,
-          submittedAt: sub.submittedAt,
-          isLate: sub.isLate,
-          history,
-          result: sub.scorePublishedAt
-            ? { score: sub.score, maxScore: a.maxScore, feedback: sub.feedback }
-            : null,
-        }
-      : null,
-  };
+  const [view] = await buildStudentAssignmentViews([found], studentId, now);
+  return view ?? null;
 }
 
 export async function submitAssignment(

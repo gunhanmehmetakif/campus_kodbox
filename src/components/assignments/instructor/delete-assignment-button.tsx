@@ -36,7 +36,7 @@ export function DeleteAssignmentButton({ assignmentId, title, courseId, submitte
       successMessage="Ödev silindi."
       action={deleteAssignmentAction}
       hiddenFields={{ id: assignmentId }}
-      onDone={() => router.replace(`/egitmen/dersler/${courseId}?sekme=odevler`)}
+      onDone={() => router.replace(`/egitmen/dersler/${courseId}?filtre=odev`)}
     />
   );
 }

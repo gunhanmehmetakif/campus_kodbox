@@ -3,14 +3,14 @@ import { Archive, Pencil } from "lucide-react";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
-import { AssignmentsTab } from "@/components/assignments/instructor/assignments-tab";
 import { PageHeader } from "@/components/common/page-header";
 import { PageSkeleton } from "@/components/common/page-skeleton";
 import { ArchiveButton } from "@/components/courses/archive-button";
 import { CourseFormDialog } from "@/components/courses/course-form-dialog";
-import { CourseTabs, parseCourseTab } from "@/components/courses/course-tabs";
-import { PostsTab } from "@/components/courses/posts-tab";
+import { CourseFeed } from "@/components/courses/course-feed";
+import { CourseFeedChips, CourseTabs, parseCourseFeedFilter, parseCourseTab } from "@/components/courses/course-tabs";
 import { RosterTab, parseRosterFilter } from "@/components/courses/roster-tab";
+import { ShareMenu } from "@/components/courses/share-menu";
 import { first, isUuid } from "@/components/courses/utils";
 import { Button } from "@/components/ui/button";
 import { getMyCourse } from "@/server/courses/queries";
@@ -26,6 +26,7 @@ export default async function InstructorCoursePage({ params, searchParams }: Pag
   const archived = course.archivedAt !== null;
   const page = Math.max(1, Number.parseInt(first(query.sayfa) ?? "1", 10) || 1);
   const filter = parseRosterFilter(first(query.filtre));
+  const feedFilter = parseCourseFeedFilter(first(query.filtre), first(query.sekme));
   const studentNo = first(query.numara)?.trim() || undefined;
 
   return (
@@ -63,15 +64,22 @@ export default async function InstructorCoursePage({ params, searchParams }: Pag
 
       <CourseTabs courseId={course.id} active={tab} />
 
-      <Suspense key={`${tab}|${page}|${filter}|${studentNo ?? ""}`} fallback={<PageSkeleton variant="list" />}>
+      {tab === "akis" ? (
+        <div className="space-y-3">
+          {archived ? null : (
+            <div className="flex sm:justify-end [&>button]:w-full sm:[&>button]:w-auto">
+              <ShareMenu courseId={course.id} />
+            </div>
+          )}
+          <CourseFeedChips courseId={course.id} active={feedFilter} />
+        </div>
+      ) : null}
+
+      <Suspense key={`${tab}|${page}|${filter}|${feedFilter}|${studentNo ?? ""}`} fallback={<PageSkeleton variant="list" />}>
         {tab === "akis" ? (
-          <PostsTab courseId={course.id} type="announcement" archived={archived} />
-        ) : tab === "materyaller" ? (
-          <PostsTab courseId={course.id} type="material" archived={archived} />
-        ) : tab === "ogrenciler" ? (
-          <RosterTab course={course} page={page} filter={filter} studentNo={studentNo} />
+          <CourseFeed courseId={course.id} filter={feedFilter} archived={archived} />
         ) : (
-          <AssignmentsTab courseId={course.id} archived={archived} />
+          <RosterTab course={course} page={page} filter={filter} studentNo={studentNo} />
         )}
       </Suspense>
     </div>

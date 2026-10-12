@@ -1,102 +1,43 @@
 import Link from "next/link";
-import { ExternalLink, FileText, Megaphone, Pencil, Plus, Trash2 } from "lucide-react";
+import { ExternalLink, FileText, Megaphone, Pencil, Trash2 } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
-import { EmptyState } from "@/components/common/empty-state";
 import { Markdown } from "@/components/common/markdown";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { deletePostAction } from "@/server/courses/actions";
-import { listCoursePosts } from "@/server/courses/queries";
 import type { CoursePost } from "./types";
 import { formatDateTime } from "./utils";
 
-type PostType = "announcement" | "material";
-
-const COPY = {
-  announcement: {
-    newLabel: "Yeni duyuru",
-    slug: "duyuru",
-    icon: Megaphone,
-    emptyTitle: "Henüz duyuru yok",
-    emptyDescription: "Duyurular öğrencilerin ders akışında görünür ve kayıtlı öğrencilere bildirim gider.",
-    deleteTitle: "Duyuruyu sil",
-  },
-  material: {
-    newLabel: "Yeni materyal",
-    slug: "materyal",
-    icon: FileText,
-    emptyTitle: "Henüz materyal yok",
-    emptyDescription: "Ders notu, slayt veya kaynak linklerini materyal olarak paylaşın.",
-    deleteTitle: "Materyali sil",
-  },
-} as const;
-
-export function newPostHref(courseId: string, type: PostType): string {
-  return `/egitmen/dersler/${courseId}/paylasim/yeni?tur=${COPY[type].slug}`;
-}
-
-export async function PostsTab({ courseId, type, archived }: { courseId: string; type: PostType; archived: boolean }) {
-  const posts = await listCoursePosts(courseId, { type });
-  const copy = COPY[type];
-
-  const newButton = archived ? null : (
-    <Button asChild className="h-11">
-      <Link href={newPostHref(courseId, type)}>
-        <Plus aria-hidden="true" />
-        {copy.newLabel}
-      </Link>
-    </Button>
-  );
-
-  return (
-    <div className="space-y-4">
-      {posts.length > 0 && newButton ? <div className="flex sm:justify-end">{newButton}</div> : null}
-      {posts.length === 0 ? (
-        <EmptyState
-          icon={copy.icon}
-          title={copy.emptyTitle}
-          description={copy.emptyDescription}
-          action={newButton ?? undefined}
-        />
-      ) : (
-        <ul className="space-y-4">
-          {posts.map((post) => (
-            <li key={post.id}>
-              <PostCard post={post} courseId={courseId} archived={archived} deleteTitle={copy.deleteTitle} />
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function PostCard({
+/** Announcement or material card of the instructor feed. */
+export function PostCard({
   post,
   courseId,
   archived,
-  deleteTitle,
 }: {
   post: CoursePost;
   courseId: string;
   archived: boolean;
-  deleteTitle: string;
 }) {
   const draft = post.status === "draft";
+  const material = post.type === "material";
   return (
     <article className="space-y-3 rounded-xl border bg-card p-4 text-card-foreground">
-      <header className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+      <header className="space-y-2">
         <div className="min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline">
+              {material ? <FileText aria-hidden="true" /> : <Megaphone aria-hidden="true" />}
+              {material ? "Materyal" : "Duyuru"}
+            </Badge>
             {draft ? <Badge variant="secondary">Taslak</Badge> : null}
-            <h3 className="font-heading text-lg leading-snug font-medium break-words">{post.title}</h3>
+            <span className="text-xs text-muted-foreground">
+              {draft || !post.publishedAt
+                ? `Son düzenleme: ${formatDateTime(post.updatedAt)}`
+                : `Yayınlandı: ${formatDateTime(post.publishedAt)}`}
+            </span>
           </div>
-          <p className="text-xs text-muted-foreground">
-            {draft || !post.publishedAt
-              ? `Son düzenleme: ${formatDateTime(post.updatedAt)}`
-              : `Yayınlandı: ${formatDateTime(post.publishedAt)}`}
-          </p>
+          <h3 className="font-heading text-lg leading-snug font-medium break-words">{post.title}</h3>
         </div>
         {archived ? null : (
           <div className="flex items-center gap-1">
@@ -118,7 +59,7 @@ function PostCard({
                   <Trash2 aria-hidden="true" />
                 </Button>
               }
-              title={deleteTitle}
+              title={material ? "Materyali sil" : "Duyuruyu sil"}
               description={<>&ldquo;{post.title}&rdquo; kalıcı olarak silinecek.</>}
               confirmLabel="Sil"
               successMessage="Silindi."

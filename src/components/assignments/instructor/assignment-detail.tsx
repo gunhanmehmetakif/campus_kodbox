@@ -6,7 +6,7 @@ import type { getAssignmentForInstructor } from "@/server/assignments/queries";
 
 type Detail = Awaited<ReturnType<typeof getAssignmentForInstructor>>;
 
-/** "Detay" tab: what students see (rules, description, links). */
+/** What students see (rules, description, links). */
 export function AssignmentDetail({ assignment }: { assignment: Detail }) {
   return (
     <div className="max-w-3xl space-y-5">

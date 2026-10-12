@@ -171,7 +171,7 @@ export function AssignmentEditor({ courseId, assignment, defaultDue = "" }: Assi
     }
   }
 
-  const backHref = assignment ? assignmentHref(assignment.id) : `/egitmen/dersler/${courseId}?sekme=odevler`;
+  const backHref = assignment ? assignmentHref(assignment.id) : `/egitmen/dersler/${courseId}?filtre=odev`;
 
   return (
     <form ref={formRef} action={formAction} noValidate className="space-y-5">

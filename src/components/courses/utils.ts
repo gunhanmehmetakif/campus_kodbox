@@ -21,6 +21,11 @@ export function formatDateTime(date: Date): string {
   return dateTime.format(date);
 }
 
-export function courseHref(courseId: string, tab?: string): string {
-  return `/egitmen/dersler/${courseId}${tab ? `?sekme=${tab}` : ""}`;
+/** `?sekme=akis|ogrenciler` plus an optional feed filter (`?filtre=`). */
+export function courseHref(courseId: string, tab?: string, filtre?: string): string {
+  const params = new URLSearchParams();
+  if (tab) params.set("sekme", tab);
+  if (filtre) params.set("filtre", filtre);
+  const query = params.toString();
+  return `/egitmen/dersler/${courseId}${query ? `?${query}` : ""}`;
 }

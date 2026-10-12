@@ -30,6 +30,10 @@ export type SubmissionCardProps = {
   /** Score already published: the submission can no longer change. */
   locked: boolean;
   submission: SavedSubmission | null;
+  /** Open straight in the edit form when a submission already exists. */
+  startEditing?: boolean;
+  /** Called after a successful submit (the dialog closes and refreshes the page). */
+  onSubmitted?: () => void;
 };
 
 const GUIDE_STEPS = [
@@ -113,9 +117,11 @@ export function SubmissionCard({
   latePenalty,
   locked,
   submission,
+  startEditing = false,
+  onSubmitted,
 }: SubmissionCardProps) {
   const [saved, setSaved] = useState<SavedSubmission | null>(null);
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(startEditing);
   const current = saved ?? submission;
 
   if (windowState === "closed" || locked) {
@@ -164,6 +170,7 @@ export function SubmissionCard({
           onSaved={(value) => {
             setSaved(value);
             setEditing(false);
+            onSubmitted?.();
           }}
           onCancel={current ? () => setEditing(false) : undefined}
         />

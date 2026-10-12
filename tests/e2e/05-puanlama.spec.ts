@@ -7,7 +7,7 @@ test.describe.configure({ mode: "serial" });
 test("eğitmen klavyeyle puanlar, yayınlar ve CSV indirir", async ({ page }) => {
   const { instructor, assignmentId } = loadState();
   await login(page, { kind: "staff", ...instructor! }, /\/egitmen/);
-  await visit(page, `/egitmen/odevler/${assignmentId}?sekme=teslimler&filtre=all`);
+  await visit(page, `/egitmen/odevler/${assignmentId}?filtre=all`);
 
   const scoreInputs = page.locator("input[data-score-index]:visible");
   await expect(scoreInputs).toHaveCount(2);

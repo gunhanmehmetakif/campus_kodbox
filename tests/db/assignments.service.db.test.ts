@@ -406,6 +406,89 @@ describe.skipIf(!available)("assignments service (DB)", async () => {
     expect(gone).toHaveLength(0);
   });
 
+  describe("listPendingGradingItems", () => {
+    const at = new Date("2026-10-10T12:00:00Z");
+
+    async function addStudents(actor: { id: string; schoolId: string }, courseId: string, n: number) {
+      const list = [];
+      for (let i = 0; i < n; i++) list.push(await createStudent());
+      await courseService.addRoster(actor, { courseId, text: list.map((s) => `${s.no} Gizli Ad`).join("\n") });
+      return list;
+    }
+
+    it("yalnız kendi, arşivsiz, puanlı, linkli, yayınlanmış ödevleri; sayılar doğru; sıra ungraded azalan sonra dueAt artan", async () => {
+      const { actor, courseId } = await setup();
+      const stranger = await setup();
+      const [s1, s2, s3] = await addStudents(actor, courseId, 3);
+      const mk = async (title: string, over: Partial<typeof assignments.$inferInsert> = {}) =>
+        (
+          await db
+            .insert(assignments)
+            .values({ courseId, title, status: "published", publishedAt: at, maxScore: 100, ...over })
+            .returning()
+        )[0]!;
+
+      const many = await mk("Çok bekleyen", { dueAt: new Date("2026-10-20T00:00:00Z") });
+      const soon = await mk("Yakın", { dueAt: new Date("2026-10-12T00:00:00Z") });
+      const unpub = await mk("Yayınlanmamış puan", { dueAt: new Date("2026-10-11T00:00:00Z") });
+      const clean = await mk("Hepsi yayınlandı");
+      await mk("Teslim yok");
+      await mk("Puansız", { maxScore: null });
+      await mk("Taslak", { status: "draft", publishedAt: null });
+      await mk("Bilgi", { submissionType: "none" });
+
+      for (const s of [s1!, s2!, s3!]) await service.submitAssignment({ id: s.id }, { assignmentId: many.id, url: DRIVE }, at);
+      for (const s of [s1!, s2!]) await service.submitAssignment({ id: s.id }, { assignmentId: soon.id, url: DRIVE }, at);
+      await service.submitAssignment({ id: s1!.id }, { assignmentId: unpub.id, url: DRIVE }, at);
+      await service.submitAssignment({ id: s2!.id }, { assignmentId: unpub.id, url: DRIVE }, at);
+      await service.submitAssignment({ id: s1!.id }, { assignmentId: clean.id, url: DRIVE }, at);
+      // many: one graded+published, so 2 ungraded; unpub: s1 scored but unpublished, s2 ungraded
+      await db
+        .update(submissions)
+        .set({ score: 90, scorePublishedAt: at })
+        .where(and(eq(submissions.assignmentId, many.id), eq(submissions.studentId, s1!.id)));
+      await db
+        .update(submissions)
+        .set({ score: 60 })
+        .where(and(eq(submissions.assignmentId, unpub.id), eq(submissions.studentId, s1!.id)));
+      await db
+        .update(submissions)
+        .set({ score: 70, scorePublishedAt: at })
+        .where(eq(submissions.assignmentId, clean.id));
+
+      // another instructor's assignment never shows up
+      const foreignAssignment = await db
+        .insert(assignments)
+        .values({ courseId: stranger.courseId, title: "Yabancı", status: "published", publishedAt: at, maxScore: 10 })
+        .returning();
+      await service.submitAssignment({ id: stranger.student.id }, { assignmentId: foreignAssignment[0]!.id, url: DRIVE }, at);
+
+      const items = await service.listPendingGradingItems(actor.id);
+      expect(items.map((i) => i.title)).toEqual(["Yakın", "Çok bekleyen", "Yayınlanmamış puan"]);
+      expect(items.map((i) => [i.ungraded, i.unpublished])).toEqual([
+        [2, 0],
+        [2, 0],
+        [1, 1],
+      ]);
+      expect(items[1]).toMatchObject({ assignmentId: many.id, course: { id: courseId, code: expect.any(String), name: "Veri Yapıları" } });
+
+      const strangerItems = await service.listPendingGradingItems(stranger.actor.id);
+      expect(strangerItems.map((i) => i.title)).toEqual(["Yabancı"]);
+    });
+
+    it("arşivli dersin ödevi listelenmez", async () => {
+      const { actor, courseId, student } = await setup();
+      const [a] = await db
+        .insert(assignments)
+        .values({ courseId, title: "Arşivde", status: "published", publishedAt: at, maxScore: 10 })
+        .returning();
+      await service.submitAssignment({ id: student.id }, { assignmentId: a!.id, url: DRIVE }, at);
+      expect(await service.listPendingGradingItems(actor.id)).toHaveLength(1);
+      await db.update(courses).set({ archivedAt: at }).where(eq(courses.id, courseId));
+      expect(await service.listPendingGradingItems(actor.id)).toHaveLength(0);
+    });
+  });
+
   describe("link erişim kontrolü (fetch mock)", () => {
     const res = (status: number, location?: string) =>
       new Response(null, { status, headers: location ? { location } : undefined });

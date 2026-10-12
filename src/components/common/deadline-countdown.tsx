@@ -11,6 +11,8 @@ type DeadlineCountdownProps = {
   dueAt: Date | string | null;
   /** Already handed in: never rendered as overdue/urgent. */
   submitted?: boolean;
+  /** Render only the relative text (nothing before mount); for use next to an absolute date. */
+  relativeOnly?: boolean;
   className?: string;
 };
 
@@ -28,7 +30,7 @@ const absoluteFormatter = new Intl.DateTimeFormat("tr-TR", {
  * Remaining time until a deadline. The relative text is computed only after mount (the server
  * has no stable "now"), so the first paint shows the absolute date in a fixed timezone.
  */
-export function DeadlineCountdown({ dueAt, submitted = false, className }: DeadlineCountdownProps) {
+export function DeadlineCountdown({ dueAt, submitted = false, relativeOnly = false, className }: DeadlineCountdownProps) {
   const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
@@ -46,6 +48,7 @@ export function DeadlineCountdown({ dueAt, submitted = false, className }: Deadl
   const absolute = absoluteFormatter.format(due);
 
   if (now === null) {
+    if (relativeOnly) return null;
     return (
       <time dateTime={due.toISOString()} className={cn("text-sm text-muted-foreground", className)}>
         {absolute}

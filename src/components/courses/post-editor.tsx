@@ -37,8 +37,8 @@ type PostEditorProps = {
 type LinkRow = { key: number; title: string; url: string };
 
 const LABELS = {
-  announcement: { noun: "duyuru", tab: "akis", titlePlaceholder: "Örn. Vize tarihi değişti" },
-  material: { noun: "materyal", tab: "materyaller", titlePlaceholder: "Örn. 3. hafta ders notları" },
+  announcement: { noun: "duyuru", filtre: "duyuru", titlePlaceholder: "Örn. Vize tarihi değişti" },
+  material: { noun: "materyal", filtre: "materyal", titlePlaceholder: "Örn. 3. hafta ders notları" },
 } as const;
 
 /** Create/edit form for announcements and materials. Warns before losing unsaved changes. */
@@ -73,7 +73,7 @@ export function PostEditor({ courseId, type, post }: PostEditorProps) {
 
   useEffect(() => {
     if (!state?.ok) return;
-    const listHref = courseHref(courseId, labels.tab);
+    const listHref = courseHref(courseId, "akis", labels.filtre);
     if (intentRef.current === "draft" && !post) {
       toast.success("Taslak kaydedildi.", { id: "post-saved" });
       router.replace(`/egitmen/dersler/${courseId}/paylasim/${state.data.id}`);
@@ -247,7 +247,7 @@ export function PostEditor({ courseId, type, post }: PostEditorProps) {
 
       <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:items-center sm:justify-end">
         <Button asChild variant="ghost" className="h-11">
-          <Link href={courseHref(courseId, labels.tab)} onClick={leave}>
+          <Link href={courseHref(courseId, "akis", labels.filtre)} onClick={leave}>
             Vazgeç
           </Link>
         </Button>

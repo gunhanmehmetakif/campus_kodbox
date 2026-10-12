@@ -15,7 +15,7 @@ export function AnnouncementsList({ items }: { items: AnnouncementItem[] }) {
       {items.map((item) => (
         <li key={item.id}>
           <Link
-            href={`${studentCourseHref(item.course.id, { sekme: "akis" })}#post-${item.id}`}
+            href={`${studentCourseHref(item.course.id)}#post-${item.id}`}
             className="flex min-h-14 flex-col justify-center gap-0.5 px-4 py-3 transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
           >
             <span className="font-medium break-words">{item.title}</span>

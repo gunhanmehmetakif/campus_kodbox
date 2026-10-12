@@ -14,7 +14,7 @@ export async function StudentDashboard() {
 
   return (
     <div className="space-y-8">
-      <PageHeader title="Panel" description="Yaklaşan teslimleriniz ve derslerinizi buradan takip edin." />
+      <PageHeader title="Panel" />
       <DashboardSection title="Yaklaşan teslimler">
         <UpcomingList items={upcoming} />
       </DashboardSection>
@@ -52,7 +52,7 @@ export async function PastCourses() {
         <ArrowLeft className="size-4" aria-hidden="true" />
         Panel
       </Link>
-      <PageHeader title="Geçmiş dersler" description="Arşivlenmiş derslerinize salt okunur erişebilirsiniz." />
+      <PageHeader title="Geçmiş dersler" />
       {courses.length === 0 ? (
         <EmptyState icon={History} title="Geçmiş ders yok" description="Arşivlenen dersler burada görünür." />
       ) : (

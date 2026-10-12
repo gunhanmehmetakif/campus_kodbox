@@ -26,7 +26,7 @@ export function UpcomingList({ items }: { items: UpcomingItem[] }) {
         return (
           <li key={item.assignmentId}>
             <Link
-              href={studentAssignmentHref(item.assignmentId)}
+              href={studentAssignmentHref(item.assignmentId, item.course.id)}
               className={cn(
                 "flex min-h-14 items-center gap-3 rounded-xl border bg-card px-4 py-3 text-card-foreground transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                 late && "border-l-4 border-l-status-late",

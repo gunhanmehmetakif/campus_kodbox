@@ -31,7 +31,7 @@ export default async function InstructorCoursesPage({ searchParams }: PageProps<
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Derslerim" description="Açtığınız dersler." actions={newCourseButton} />
+      <PageHeader title="Derslerim" actions={newCourseButton} />
       <nav aria-label="Ders durumu" className="overflow-x-auto border-b">
         <ul className="flex min-w-max gap-1">
           {[

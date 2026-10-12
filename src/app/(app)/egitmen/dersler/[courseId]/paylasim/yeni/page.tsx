@@ -29,8 +29,7 @@ async function NewPost({ params, searchParams }: Pick<Props, "params" | "searchP
   if (!isUuid(courseId)) notFound();
   const course = await getMyCourse(courseId);
   const type = first(query.tur) === "materyal" ? "material" : "announcement";
-  const tab = type === "material" ? "materyaller" : "akis";
-  const back = `/egitmen/dersler/${course.id}?sekme=${tab}`;
+  const back = `/egitmen/dersler/${course.id}?filtre=${type === "material" ? "materyal" : "duyuru"}`;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">

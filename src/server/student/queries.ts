@@ -8,13 +8,15 @@ import { getRequestNow } from "@/lib/server/now";
 import {
   findStudentCourse,
   getDashboard,
-  listCourseAssignments,
   listCourseFeed,
+  listMyAssignmentCards,
   listPastCourseCards,
   type AnnouncementItem,
+  type AssignmentGroup,
+  type FeedFilter,
   type FeedItem,
   type Page,
-  type StudentAssignmentListItem,
+  type StudentAssignmentCard,
   type StudentCourseCard,
   type StudentCourseView,
   type StudentDashboard,
@@ -23,9 +25,11 @@ import {
 
 export type {
   AnnouncementItem,
+  AssignmentGroup,
+  FeedFilter,
   FeedItem,
   Page,
-  StudentAssignmentListItem,
+  StudentAssignmentCard,
   StudentCourseCard,
   StudentCourseView,
   StudentDashboard,
@@ -55,22 +59,17 @@ export async function getStudentCourse(courseId: string): Promise<StudentCourseV
 
 export async function listStudentCourseFeed(
   courseId: string,
-  o: { tab: "akis" | "materyaller"; page?: number },
+  o: { filter: FeedFilter; page?: number },
 ): Promise<Page<FeedItem>> {
-  await getRequestNow();
+  const now = new Date(await getRequestNow());
   const user = await requireRole("student");
-  const feed = await listCourseFeed(courseId, user.id, o);
+  const feed = await listCourseFeed(courseId, user.id, now, o);
   if (!feed) notFound();
   return feed;
 }
 
-export async function listStudentCourseAssignments(
-  courseId: string,
-  o: { filter: "bekleyen" | "teslim" | "puan" },
-): Promise<StudentAssignmentListItem[]> {
+export async function listMyAssignments(): Promise<StudentAssignmentCard[]> {
   const now = new Date(await getRequestNow());
   const user = await requireRole("student");
-  const items = await listCourseAssignments(courseId, user.id, now, o);
-  if (!items) notFound();
-  return items;
+  return listMyAssignmentCards(user.id, now);
 }

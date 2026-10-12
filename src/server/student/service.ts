@@ -5,7 +5,13 @@ import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, or, sql } fr
 import { db } from "@/db";
 import { assignments, courseRoster, courses, posts, submissions, terms, users } from "@/db/schema";
 import type { Page } from "@/lib/page";
-import { getSubmissionWindow, type SubmissionWindow } from "@/server/assignments/rules";
+import {
+  assignmentGroup,
+  getSubmissionWindow,
+  type AssignmentGroup,
+  type SubmissionWindow,
+} from "@/server/assignments/rules";
+import { buildStudentAssignmentViews, type StudentAssignmentView } from "@/server/assignments/service";
 import { clampPage } from "@/server/courses/service";
 
 /**
@@ -14,7 +20,8 @@ import { clampPage } from "@/server/courses/service";
  * courses are exactly the `course_roster` rows linked to them; only published content is read.
  */
 
-export type { Page, SubmissionWindow };
+export { assignmentGroup };
+export type { AssignmentGroup, Page, StudentAssignmentView, SubmissionWindow };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -66,6 +73,13 @@ export type StudentCourseView = {
   archived: boolean;
 };
 
+export type StudentAssignmentCard = StudentAssignmentView & {
+  publishedAt: Date;
+  group: AssignmentGroup;
+};
+
+export type FeedFilter = "tumu" | "odev" | "duyuru" | "materyal";
+
 export type FeedItem =
   | {
       kind: "post";
@@ -76,19 +90,7 @@ export type FeedItem =
       links: { title: string; url: string }[];
       publishedAt: Date;
     }
-  | { kind: "assignment"; id: string; title: string; dueAt: Date | null; publishedAt: Date };
-
-export type StudentAssignmentListItem = {
-  id: string;
-  title: string;
-  submissionType: "link" | "none";
-  dueAt: Date | null;
-  lateUntil: Date | null;
-  window: SubmissionWindow;
-  submittedAt: Date | null;
-  isLate: boolean;
-  result: { score: number | null; maxScore: number | null } | null;
-};
+  | { kind: "assignment"; publishedAt: Date; assignment: StudentAssignmentCard };
 
 /* ───────────────────────────── shared pieces ───────────────────────────── */
 
@@ -282,148 +284,132 @@ export async function findStudentCourse(courseId: string, userId: string): Promi
   };
 }
 
+type AssignmentRow = { assignment: typeof assignments.$inferSelect; course: typeof courses.$inferSelect };
+
+const publishedAtOf = (a: typeof assignments.$inferSelect) => a.publishedAt ?? a.createdAt;
+
+const GROUP_RANK: Record<AssignmentGroup, number> = { bekleyen: 0, teslim: 1, puan: 2, diger: 3 };
+
+/** Group order from docs/fazlar/F8-sade-arayuz.md section 1; ids break ties so the order is stable. */
+export function compareAssignmentCards(a: StudentAssignmentCard, b: StudentAssignmentCard): number {
+  const rank = GROUP_RANK[a.group] - GROUP_RANK[b.group];
+  if (rank !== 0) return rank;
+  let diff = 0;
+  if (a.group === "bekleyen") {
+    const ad = a.dueAt?.getTime() ?? Number.POSITIVE_INFINITY;
+    const bd = b.dueAt?.getTime() ?? Number.POSITIVE_INFINITY;
+    diff = ad === bd ? 0 : ad < bd ? -1 : 1;
+  } else if (a.group === "teslim") {
+    diff = (b.submission?.submittedAt.getTime() ?? 0) - (a.submission?.submittedAt.getTime() ?? 0);
+  } else {
+    diff = b.publishedAt.getTime() - a.publishedAt.getTime();
+  }
+  return diff || a.id.localeCompare(b.id);
+}
+
+async function toCards(rows: AssignmentRow[], userId: string, now: Date): Promise<StudentAssignmentCard[]> {
+  const views = await buildStudentAssignmentViews(rows, userId, now);
+  return views.map((view, i) => ({
+    ...view,
+    publishedAt: publishedAtOf(rows[i]!.assignment),
+    group: assignmentGroup(view),
+  }));
+}
+
 export async function listCourseFeed(
   courseId: string,
   userId: string,
-  o: { tab: "akis" | "materyaller"; page?: number },
+  now: Date,
+  o: { filter: FeedFilter; page?: number },
 ): Promise<Page<FeedItem> | null> {
-  if (!(await findStudentCourse(courseId, userId))) return null;
+  const course = await findStudentCourse(courseId, userId);
+  if (!course) return null;
+
+  const assignmentWhere = and(
+    eq(assignments.courseId, courseId),
+    eq(assignments.status, "published"),
+    isNotNull(assignments.publishedAt),
+  );
+  const loadAssignments = (limit: number) =>
+    db
+      .select({ assignment: assignments, course: courses })
+      .from(assignments)
+      .innerJoin(courses, eq(courses.id, assignments.courseId))
+      .where(assignmentWhere)
+      .orderBy(desc(assignments.publishedAt), asc(assignments.id))
+      .limit(limit);
+
+  if (o.filter === "odev") {
+    const rows = await loadAssignments(ASSIGNMENT_LIST_LIMIT);
+    const cards = (await toCards(rows, userId, now)).sort(compareAssignmentCards);
+    const items: FeedItem[] = cards.map((assignment) => ({
+      kind: "assignment",
+      publishedAt: assignment.publishedAt,
+      assignment,
+    }));
+    return { items, total: items.length, page: 1, pageSize: ASSIGNMENT_LIST_LIMIT };
+  }
+
   const { page, pageSize } = clampPage(o.page, FEED_PAGE_SIZE);
   const take = page * pageSize;
   const postWhere = and(
     eq(posts.courseId, courseId),
     eq(posts.status, "published"),
     isNotNull(posts.publishedAt),
-    o.tab === "materyaller" ? eq(posts.type, "material") : undefined,
-  );
-  const assignmentWhere = and(
-    eq(assignments.courseId, courseId),
-    eq(assignments.status, "published"),
-    isNotNull(assignments.publishedAt),
+    o.filter === "materyal" ? eq(posts.type, "material") : undefined,
+    o.filter === "duyuru" ? eq(posts.type, "announcement") : undefined,
   );
 
   const [postRows, [postTotal]] = await Promise.all([
-    db
-      .select()
-      .from(posts)
-      .where(postWhere)
-      .orderBy(desc(posts.publishedAt), asc(posts.id))
-      .limit(take),
+    db.select().from(posts).where(postWhere).orderBy(desc(posts.publishedAt), asc(posts.id)).limit(take),
     db.select({ n: count() }).from(posts).where(postWhere),
   ]);
 
-  const items: FeedItem[] = postRows.map((p) => ({
-    kind: "post",
-    id: p.id,
-    postType: p.type,
-    title: p.title,
-    bodyMd: p.bodyMd,
-    links: p.links,
-    publishedAt: p.publishedAt as Date,
-  }));
+  type Entry = { at: Date; id: string; post?: (typeof postRows)[number]; row?: AssignmentRow };
+  const entries: Entry[] = postRows.map((p) => ({ at: p.publishedAt as Date, id: p.id, post: p }));
   let total = postTotal?.n ?? 0;
 
-  if (o.tab === "akis") {
+  if (o.filter === "tumu") {
     const [assignmentRows, [assignmentTotal]] = await Promise.all([
-      db
-        .select({
-          id: assignments.id,
-          title: assignments.title,
-          dueAt: assignments.dueAt,
-          publishedAt: assignments.publishedAt,
-        })
-        .from(assignments)
-        .where(assignmentWhere)
-        .orderBy(desc(assignments.publishedAt), asc(assignments.id))
-        .limit(take),
+      loadAssignments(take),
       db.select({ n: count() }).from(assignments).where(assignmentWhere),
     ]);
-    for (const a of assignmentRows) {
-      items.push({ kind: "assignment", id: a.id, title: a.title, dueAt: a.dueAt, publishedAt: a.publishedAt as Date });
-    }
+    for (const row of assignmentRows) entries.push({ at: publishedAtOf(row.assignment), id: row.assignment.id, row });
     total += assignmentTotal?.n ?? 0;
   }
 
-  items.sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime() || a.id.localeCompare(b.id));
-  return { items: items.slice((page - 1) * pageSize, page * pageSize), total, page, pageSize };
+  entries.sort((a, b) => b.at.getTime() - a.at.getTime() || a.id.localeCompare(b.id));
+  const pageEntries = entries.slice((page - 1) * pageSize, page * pageSize);
+
+  // Only the assignments that land on this page are expanded into full cards.
+  const pageRows = pageEntries.flatMap((e) => (e.row ? [e.row] : []));
+  const cards = new Map((await toCards(pageRows, userId, now)).map((c) => [c.id, c]));
+
+  const items: FeedItem[] = pageEntries.map((e) =>
+    e.post
+      ? {
+          kind: "post",
+          id: e.post.id,
+          postType: e.post.type,
+          title: e.post.title,
+          bodyMd: e.post.bodyMd,
+          links: e.post.links,
+          publishedAt: e.at,
+        }
+      : { kind: "assignment", publishedAt: e.at, assignment: cards.get(e.id)! },
+  );
+  return { items, total, page, pageSize };
 }
 
-/* ───────────────────────────── assignments ───────────────────────────── */
-
-const WINDOW_RANK: Record<SubmissionWindow["state"], number> = { open: 0, late: 0, no_submission: 2, closed: 3 };
-
-export async function listCourseAssignments(
-  courseId: string,
-  userId: string,
-  now: Date,
-  o: { filter: "bekleyen" | "teslim" | "puan" },
-): Promise<StudentAssignmentListItem[] | null> {
-  const course = await findStudentCourse(courseId, userId);
-  if (!course) return null;
-
-  const filterCondition =
-    o.filter === "bekleyen"
-      ? isNull(submissions.id)
-      : o.filter === "teslim"
-        ? and(isNotNull(submissions.id), isNull(submissions.scorePublishedAt))
-        : isNotNull(submissions.scorePublishedAt);
-  const order =
-    o.filter === "teslim"
-      ? [desc(submissions.submittedAt), asc(assignments.id)]
-      : o.filter === "puan"
-        ? [desc(submissions.scorePublishedAt), asc(assignments.id)]
-        : [asc(assignments.id)];
-
+/** Published assignments of the student's non-archived courses, in group order (max 200). */
+export async function listMyAssignmentCards(userId: string, now: Date): Promise<StudentAssignmentCard[]> {
   const rows = await db
-    .select({
-      id: assignments.id,
-      title: assignments.title,
-      submissionType: assignments.submissionType,
-      dueAt: assignments.dueAt,
-      lateAllowed: assignments.lateAllowed,
-      lateUntil: assignments.lateUntil,
-      maxScore: assignments.maxScore,
-      submittedAt: submissions.submittedAt,
-      isLate: submissions.isLate,
-      score: submissions.score,
-      scorePublishedAt: submissions.scorePublishedAt,
-    })
-    .from(assignments)
-    .leftJoin(submissions, joinMySubmission(userId))
-    .where(and(eq(assignments.courseId, courseId), eq(assignments.status, "published"), filterCondition))
-    .orderBy(...order);
-
-  const items = rows.map((r) => {
-    const window = getSubmissionWindow(
-      { submissionType: r.submissionType, dueAt: r.dueAt, lateAllowed: r.lateAllowed, lateUntil: r.lateUntil },
-      now,
-      course.archived,
-    );
-    const item: StudentAssignmentListItem = {
-      id: r.id,
-      title: r.title,
-      submissionType: r.submissionType,
-      dueAt: r.dueAt,
-      lateUntil: r.lateUntil,
-      window,
-      submittedAt: r.submittedAt,
-      isLate: r.isLate ?? false,
-      result: r.scorePublishedAt ? { score: r.score, maxScore: r.maxScore } : null,
-    };
-    return item;
-  });
-
-  if (o.filter === "bekleyen") {
-    // open/late by dueAt asc (nulls after), then no_submission, then closed
-    const dueKey = (i: StudentAssignmentListItem) => i.dueAt?.getTime() ?? Number.POSITIVE_INFINITY;
-    items.sort((a, b) => {
-      const rank = WINDOW_RANK[a.window.state] - WINDOW_RANK[b.window.state];
-      if (rank !== 0) return rank;
-      const due = dueKey(a) - dueKey(b);
-      if (due !== 0 && Number.isFinite(due)) return due;
-      if (dueKey(a) !== dueKey(b)) return dueKey(a) === Number.POSITIVE_INFINITY ? 1 : -1;
-      return a.id.localeCompare(b.id);
-    });
-  }
-  return items.slice(0, ASSIGNMENT_LIST_LIMIT);
+    .select({ assignment: assignments, course: courses })
+    .from(courseRoster)
+    .innerJoin(courses, eq(courses.id, courseRoster.courseId))
+    .innerJoin(assignments, eq(assignments.courseId, courses.id))
+    .where(and(eq(courseRoster.userId, userId), isNull(courses.archivedAt), eq(assignments.status, "published")))
+    .orderBy(desc(assignments.publishedAt), asc(assignments.id))
+    .limit(ASSIGNMENT_LIST_LIMIT);
+  return (await toCards(rows, userId, now)).sort(compareAssignmentCards);
 }

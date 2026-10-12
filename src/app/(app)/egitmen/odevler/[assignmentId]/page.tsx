@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { ArrowLeft, ClipboardList, Pencil } from "lucide-react";
+import { ArrowLeft, ChevronDown, ClipboardList, Pencil } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 import { AssignmentDetail } from "@/components/assignments/instructor/assignment-detail";
-import { AssignmentTabs, parseAssignmentTab } from "@/components/assignments/instructor/assignment-tabs";
+import { submissionCounts } from "@/components/assignments/instructor/assignment-feed-card";
+import { formatShort } from "@/components/assignments/instructor/format";
 import { DeleteAssignmentButton } from "@/components/assignments/instructor/delete-assignment-button";
 import { SubmissionsPanel, parseSubmissionFilter } from "@/components/assignments/instructor/submissions-panel";
 import { EmptyState } from "@/components/common/empty-state";
@@ -36,21 +37,29 @@ async function AssignmentView({ params, searchParams }: Pick<Props, "params" | "
   const archived = a.course.archivedAt !== null;
   const draft = a.status === "draft";
   const grading = a.maxScore !== null;
-  const tab = parseAssignmentTab(first(query.sekme)) ?? (!draft && a.counts.submitted > 0 ? "teslimler" : "detay");
+  const showSubmissions = !draft && a.submissionType === "link";
   const filter = parseSubmissionFilter(first(query.filtre), grading);
   const page = Math.max(1, Number.parseInt(first(query.sayfa) ?? "1", 10) || 1);
+
+  const unpublished = Math.max(0, a.counts.graded - a.counts.published);
+  const summary = [
+    draft ? "Taslak: öğrenciler henüz görmüyor" : null,
+    !draft && a.submissionType === "link" ? submissionCounts(a) : null,
+    !draft && a.maxScore !== null && unpublished > 0 ? `${unpublished} yayınlanmadı` : null,
+    a.dueAt ? `Son teslim ${formatShort(a.dueAt)}` : "Süresiz",
+  ].filter(Boolean);
 
   return (
     <div className="space-y-6">
       <Button asChild variant="ghost" className="-ml-3 h-11">
-        <Link href={`/egitmen/dersler/${a.course.id}?sekme=odevler`}>
+        <Link href={`/egitmen/dersler/${a.course.id}?filtre=odev`}>
           <ArrowLeft aria-hidden="true" />
           {a.course.code} · {a.course.name}
         </Link>
       </Button>
       <PageHeader
         title={a.title}
-        description={draft ? "Taslak: öğrenciler henüz görmüyor." : undefined}
+        description={summary.join(" · ")}
         actions={
           archived ? null : (
             <>
@@ -72,11 +81,7 @@ async function AssignmentView({ params, searchParams }: Pick<Props, "params" | "
         }
       />
 
-      <AssignmentTabs assignmentId={a.id} active={tab} />
-
-      {tab === "detay" ? (
-        <AssignmentDetail assignment={a} />
-      ) : draft ? (
+      {draft ? (
         <EmptyState
           icon={ClipboardList}
           title="Ödev henüz yayınlanmadı"
@@ -93,6 +98,19 @@ async function AssignmentView({ params, searchParams }: Pick<Props, "params" | "
           <SubmissionsPanel assignment={a} filter={filter} page={page} />
         </Suspense>
       )}
+
+      <details open={!showSubmissions} className="group rounded-xl border bg-card">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-4 text-sm font-medium [&::-webkit-details-marker]:hidden">
+          Ödev açıklaması
+          <ChevronDown
+            className="size-4 text-muted-foreground transition-transform group-open:rotate-180"
+            aria-hidden="true"
+          />
+        </summary>
+        <div className="border-t p-4">
+          <AssignmentDetail assignment={a} />
+        </div>
+      </details>
     </div>
   );
 }

@@ -53,15 +53,15 @@ export async function SubmissionsPanel({ assignment, filter, page }: Submissions
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <nav aria-label="Teslim filtresi" className="-mb-1 overflow-x-auto pb-1">
-          <ul className="flex min-w-max gap-2">
+        <nav aria-label="Teslim filtresi">
+          <ul className="flex flex-wrap gap-2">
             {chips.map((key) => (
               <li key={key}>
                 <Link
-                  href={`${assignmentHref(assignment.id, "teslimler")}&filtre=${key}`}
+                  href={assignmentHref(assignment.id, key)}
                   aria-current={key === filter ? "true" : undefined}
                   className={cn(
-                    "inline-flex h-11 items-center rounded-full border px-4 text-sm whitespace-nowrap transition-colors",
+                    "inline-flex h-10 items-center rounded-full border px-3.5 text-sm whitespace-nowrap transition-colors",
                     key === filter ? "border-primary bg-primary text-primary-foreground" : "bg-card hover:bg-accent",
                   )}
                 >

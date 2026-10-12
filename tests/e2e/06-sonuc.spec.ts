@@ -14,7 +14,8 @@ test("öğrenci puan bildirimini ve sonuç kartını görür", async ({ page }) 
   const notification = page.getByRole("button", { name: /Puanınız yayınlandı/ });
   await expect(notification).toBeVisible();
   await notification.click();
-  await page.waitForURL(/\/ogrenci\/odevler\//);
+  // Legacy assignment link redirects to the feed card.
+  await page.waitForURL(/\/ogrenci\/dersler\/[^?]+\?odev=/);
 
   const result = page.locator('section[aria-label="Sonuç"]');
   await expect(result).toBeVisible();

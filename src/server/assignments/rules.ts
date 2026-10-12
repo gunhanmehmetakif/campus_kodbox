@@ -28,6 +28,18 @@ export function getSubmissionWindow(a: AssignmentTiming, now: Date, courseArchiv
   return { state: "late", closesAt: a.lateUntil };
 }
 
+export type AssignmentGroup = "bekleyen" | "teslim" | "puan" | "diger";
+
+/** Which student-facing group an assignment belongs to (docs/fazlar/F8-sade-arayuz.md section 1). */
+export function assignmentGroup(view: {
+  window: SubmissionWindow;
+  submission: null | { result: unknown };
+}): AssignmentGroup {
+  if (view.submission) return view.submission.result ? "puan" : "teslim";
+  if (view.window.state === "open" || view.window.state === "late") return "bekleyen";
+  return "diger";
+}
+
 export function isLateAt(a: AssignmentTiming, at: Date): boolean {
   return a.dueAt !== null && at.getTime() > a.dueAt.getTime();
 }

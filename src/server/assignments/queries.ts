@@ -12,15 +12,17 @@ import {
   getAssignmentDetail,
   getStudentAssignmentView,
   listAssignmentSummaries,
+  listPendingGradingItems,
   listSubmissionHistory,
   listSubmissionRows,
   type AssignmentDetail,
   type AssignmentSummary,
+  type PendingGradingItem,
   type StudentAssignmentView,
   type SubmissionRow,
 } from "./service";
 
-export type { AssignmentDetail, AssignmentSummary, Page, StudentAssignmentView, SubmissionRow };
+export type { AssignmentDetail, AssignmentSummary, Page, PendingGradingItem, StudentAssignmentView, SubmissionRow };
 export type { SubmissionWindow } from "./rules";
 
 export async function listCourseAssignments(courseId: string): Promise<AssignmentSummary[]> {
@@ -65,4 +67,10 @@ export async function getAssignmentForStudent(assignmentId: string): Promise<Stu
   const view = await getStudentAssignmentView(assignmentId, user.id, new Date());
   if (!view) notFound();
   return view;
+}
+
+export async function listPendingGrading(): Promise<PendingGradingItem[]> {
+  await connection();
+  const user = await requireRole("instructor");
+  return listPendingGradingItems(user.id);
 }

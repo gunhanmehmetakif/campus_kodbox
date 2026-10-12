@@ -26,8 +26,9 @@ export function parseScore(raw: string): number | null | undefined {
   return Number.isFinite(value) ? value : undefined;
 }
 
-export function assignmentHref(assignmentId: string, tab?: "detay" | "teslimler"): string {
-  return `/egitmen/odevler/${assignmentId}${tab ? `?sekme=${tab}` : ""}`;
+/** Instructor assignment page; `filtre` preselects a submissions filter. */
+export function assignmentHref(assignmentId: string, filtre?: string): string {
+  return `/egitmen/odevler/${assignmentId}${filtre ? `?filtre=${filtre}` : ""}`;
 }
 
 /** `datetime-local` value (Istanbul) for `days` from now at 23:59. */

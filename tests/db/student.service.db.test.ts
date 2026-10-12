@@ -143,6 +143,11 @@ describe.skipIf(!available)("student service (DB)", async () => {
     return row!;
   }
 
+  const feed = (courseId: string, userId: string, filter: "tumu" | "odev" | "duyuru" | "materyal", page?: number) =>
+    service.listCourseFeed(courseId, userId, NOW, { filter, page });
+  const titles = (page: { items: Array<{ kind: string; title?: string; assignment?: { title: string } }> }) =>
+    page.items.map((i) => i.title ?? i.assignment!.title);
+
   const submit = (studentId: string, assignmentId: string, at = hours(-1)) =>
     assignmentService.submitAssignment({ id: studentId }, { assignmentId, url: DRIVE }, at);
 
@@ -154,8 +159,8 @@ describe.skipIf(!available)("student service (DB)", async () => {
 
     expect(await service.findStudentCourse(courseId, other.id)).toBeNull();
     expect(await service.findStudentCourse("not-a-uuid", mine.id)).toBeNull();
-    expect(await service.listCourseFeed(courseId, other.id, { tab: "akis" })).toBeNull();
-    expect(await service.listCourseAssignments(courseId, other.id, NOW, { filter: "bekleyen" })).toBeNull();
+    expect(await feed(courseId, other.id, "tumu")).toBeNull();
+    expect(await feed(courseId, other.id, "odev")).toBeNull();
 
     const view = await service.findStudentCourse(courseId, mine.id);
     expect(view).toMatchObject({ id: courseId, instructorName: "Test Eğitmen", archived: false });
@@ -173,10 +178,12 @@ describe.skipIf(!available)("student service (DB)", async () => {
     expect(dash.upcoming).toHaveLength(0);
     expect(dash.announcements).toHaveLength(0);
     expect(dash.courses[0]!.pendingCount).toBe(0);
-    const feed = await service.listCourseFeed(courseId, s.id, { tab: "akis" });
-    expect(feed!.items).toHaveLength(0);
-    expect(feed!.total).toBe(0);
-    expect(await service.listCourseAssignments(courseId, s.id, NOW, { filter: "bekleyen" })).toHaveLength(0);
+    for (const filter of ["tumu", "odev", "duyuru", "materyal"] as const) {
+      const page = await feed(courseId, s.id, filter);
+      expect(page!.items).toHaveLength(0);
+      expect(page!.total).toBe(0);
+    }
+    expect(await service.listMyAssignmentCards(s.id, NOW)).toHaveLength(0);
   });
 
   it("yaklaşan teslimler: late üstte, süresiz sonda, kapalı pencere ve none tipi yok, pendingCount tutarlı", async () => {
@@ -263,10 +270,11 @@ describe.skipIf(!available)("student service (DB)", async () => {
     expect(dash.announcements[0]!.course).toMatchObject({ id: courseId });
   });
 
-  it("akış: duyuru + materyal + ödev publishedAt azalan; materyaller sekmesi yalnız materyal; sayfalama", async () => {
+  it("akış: filtreler, publishedAt azalan, ödev kartı, sayfalama; başka ders ve taslak dönmez", async () => {
     const { newCourse } = await setup();
     const s = await createStudent();
     const courseId = await newCourse([s]);
+    const otherCourse = await newCourse([s]);
     await addPost(courseId, { title: "Duyuru", publishedAt: hours(-10) });
     await addPost(courseId, {
       type: "material",
@@ -275,84 +283,129 @@ describe.skipIf(!available)("student service (DB)", async () => {
       links: [{ title: "Slayt", url: "https://example.com/s" }],
       publishedAt: hours(-30),
     });
-    await addAssignment(courseId, { title: "Ödev", publishedAt: hours(-20) });
+    await addAssignment(courseId, { title: "Ödev", publishedAt: hours(-20), dueAt: hours(5) });
+    await addAssignment(courseId, { title: "Taslak ödev", status: "draft", publishedAt: null });
+    await addAssignment(otherCourse, { title: "Başka ders ödevi" });
+    await addPost(otherCourse, { title: "Başka duyuru" });
 
-    const akis = await service.listCourseFeed(courseId, s.id, { tab: "akis" });
-    expect(akis!.items.map((i) => i.title)).toEqual(["Duyuru", "Ödev", "Materyal"]);
-    expect(akis!.items.map((i) => i.kind)).toEqual(["post", "assignment", "post"]);
-    expect(akis!.items[2]).toMatchObject({ postType: "material", bodyMd: "**ders**", links: [{ title: "Slayt" }] });
-    expect(akis!.total).toBe(3);
+    const tumu = await feed(courseId, s.id, "tumu");
+    expect(titles(tumu!)).toEqual(["Duyuru", "Ödev", "Materyal"]);
+    expect(tumu!.items.map((i) => i.kind)).toEqual(["post", "assignment", "post"]);
+    expect(tumu!.items[2]).toMatchObject({ postType: "material", bodyMd: "**ders**", links: [{ title: "Slayt" }] });
+    expect(tumu!.items[1]).toMatchObject({
+      assignment: { title: "Ödev", group: "bekleyen", course: { id: courseId }, window: { state: "open" }, submission: null },
+    });
+    expect(tumu!.total).toBe(3);
 
-    const materyal = await service.listCourseFeed(courseId, s.id, { tab: "materyaller" });
-    expect(materyal!.items.map((i) => i.title)).toEqual(["Materyal"]);
-    expect(materyal!.total).toBe(1);
+    expect(titles((await feed(courseId, s.id, "materyal"))!)).toEqual(["Materyal"]);
+    expect(titles((await feed(courseId, s.id, "duyuru"))!)).toEqual(["Duyuru"]);
+    const odev = await feed(courseId, s.id, "odev");
+    expect(titles(odev!)).toEqual(["Ödev"]);
+    expect(odev!.total).toBe(1);
 
     for (let i = 0; i < 22; i++) await addPost(courseId, { title: `P${i}`, publishedAt: hours(-100 - i) });
-    const p1 = await service.listCourseFeed(courseId, s.id, { tab: "akis", page: 1 });
-    const p2 = await service.listCourseFeed(courseId, s.id, { tab: "akis", page: 2 });
+    const p1 = await feed(courseId, s.id, "tumu", 1);
+    const p2 = await feed(courseId, s.id, "tumu", 2);
     expect(p1!.items).toHaveLength(20);
     expect(p2!.items).toHaveLength(5);
     expect(p2!.total).toBe(25);
-    expect(new Set([...p1!.items, ...p2!.items].map((i) => i.id)).size).toBe(25);
+    const key = (i: NonNullable<typeof p1>["items"][number]) => (i.kind === "post" ? i.id : i.assignment.id);
+    expect(new Set([...p1!.items, ...p2!.items].map(key)).size).toBe(25);
   });
 
-  it("ödev filtreleri: bekleyen sırası, teslim ve puan kovaları, yayınlanmamış puan result: null", async () => {
+  it("odev filtresi: grup sırası (bekleyen dueAt artan, teslim submittedAt azalan, puan/diğer publishedAt azalan), geçmiş toplu", async () => {
     const { actor, newCourse } = await setup();
     const s = await createStudent();
     const courseId = await newCourse([s]);
 
-    const closed = await addAssignment(courseId, { title: "Kapalı", dueAt: hours(-30) });
-    const none = await addAssignment(courseId, { title: "Bilgi", submissionType: "none" });
-    const endless = await addAssignment(courseId, { title: "Süresiz" });
-    const late = await addAssignment(courseId, { title: "Geç", dueAt: hours(-2), lateAllowed: true });
-    const later = await addAssignment(courseId, { title: "Sonra", dueAt: hours(40) });
-    const soon = await addAssignment(courseId, { title: "Yakın", dueAt: hours(4) });
-    const waiting = await addAssignment(courseId, { title: "Bekleyen puan", dueAt: hours(30), maxScore: 100 });
-    const scored = await addAssignment(courseId, { title: "Puanlı", dueAt: hours(31), maxScore: 100 });
+    await addAssignment(courseId, { title: "Kapalı", dueAt: hours(-30), publishedAt: hours(-60) });
+    await addAssignment(courseId, { title: "Bilgi", submissionType: "none", publishedAt: hours(-50) });
+    await addAssignment(courseId, { title: "Süresiz" });
+    await addAssignment(courseId, { title: "Geç", dueAt: hours(-2), lateAllowed: true });
+    await addAssignment(courseId, { title: "Sonra", dueAt: hours(40) });
+    await addAssignment(courseId, { title: "Yakın", dueAt: hours(4) });
+    const t1 = await addAssignment(courseId, { title: "Teslim eski", dueAt: hours(30), maxScore: 100 });
+    const t2 = await addAssignment(courseId, { title: "Teslim yeni", dueAt: hours(31), maxScore: 100 });
+    const scored = await addAssignment(courseId, { title: "Puanlı", dueAt: hours(32), maxScore: 100 });
+    const scored2 = await addAssignment(courseId, {
+      title: "Puanlı eski",
+      dueAt: hours(33),
+      maxScore: 100,
+      publishedAt: hours(-100),
+    });
 
-    let bekleyen = await service.listCourseAssignments(courseId, s.id, NOW, { filter: "bekleyen" });
-    expect(bekleyen!.map((i) => i.title)).toEqual([
+    await submit(s.id, t1.id, hours(-5));
+    await submit(s.id, t2.id, hours(-3));
+    await submit(s.id, scored.id, hours(-4));
+    await submit(s.id, scored2.id, hours(-4));
+    await submit(s.id, scored2.id, hours(-2));
+    for (const [a, score] of [
+      [scored, 80],
+      [scored2, 70],
+    ] as const) {
+      await db
+        .update(submissions)
+        .set({ score, gradedAt: NOW, gradedById: actor.id, scorePublishedAt: hours(-1) })
+        .where(eq(submissions.assignmentId, a.id));
+    }
+    // t1 has an unpublished score: stays in "teslim" with result null
+    await db.update(submissions).set({ score: 55, gradedAt: NOW }).where(eq(submissions.assignmentId, t1.id));
+
+    const odev = await feed(courseId, s.id, "odev");
+    expect(titles(odev!)).toEqual([
       "Geç",
       "Yakın",
-      "Bekleyen puan",
-      "Puanlı",
       "Sonra",
       "Süresiz",
+      "Teslim yeni",
+      "Teslim eski",
+      "Puanlı",
+      "Puanlı eski",
       "Bilgi",
       "Kapalı",
     ]);
-    expect(bekleyen![0]!.window.state).toBe("late");
-    expect(bekleyen!.find((i) => i.id === none.id)).toMatchObject({ submissionType: "none", window: { state: "no_submission" } });
-    expect(bekleyen!.find((i) => i.id === closed.id)!.window.state).toBe("closed");
-    void endless;
-    void late;
-    void later;
-    void soon;
+    expect(odev!.total).toBe(10);
+    const cards = odev!.items.map((i) => (i.kind === "assignment" ? i.assignment : null)!);
+    expect(cards.map((c) => c.group)).toEqual([
+      "bekleyen",
+      "bekleyen",
+      "bekleyen",
+      "bekleyen",
+      "teslim",
+      "teslim",
+      "puan",
+      "puan",
+      "diger",
+      "diger",
+    ]);
+    expect(cards[0]!.window.state).toBe("late");
+    expect(cards.find((c) => c.title === "Teslim eski")!.submission!.result).toBeNull();
+    expect(cards.find((c) => c.title === "Puanlı")!.submission!.result).toMatchObject({ score: 80, maxScore: 100 });
+    expect(cards.find((c) => c.title === "Puanlı eski")!.submission!.history).toHaveLength(2);
+    expect(cards.find((c) => c.title === "Bilgi")!.window.state).toBe("no_submission");
+    expect(cards.find((c) => c.title === "Kapalı")!.window.state).toBe("closed");
+  });
 
-    await submit(s.id, waiting.id, hours(-3));
-    await submit(s.id, scored.id, hours(-2));
-    bekleyen = await service.listCourseAssignments(courseId, s.id, NOW, { filter: "bekleyen" });
-    expect(bekleyen!.map((i) => i.id)).not.toContain(waiting.id);
+  it("listMyAssignmentCards: arşivli dersi ve taslağı dışlar, ders bilgisi taşır, grup sırasıyla gelir", async () => {
+    const { newCourse } = await setup();
+    const s = await createStudent();
+    const outsider = await createStudent();
+    const activeId = await newCourse([s]);
+    const archivedId = await newCourse([s]);
+    const foreignId = await newCourse([outsider]);
+    const done = await addAssignment(activeId, { title: "Bitti", dueAt: hours(10) });
+    await addAssignment(activeId, { title: "Bekleyen", dueAt: hours(20) });
+    await addAssignment(activeId, { title: "Taslak", status: "draft", publishedAt: null });
+    await addAssignment(archivedId, { title: "Arşiv ödevi" });
+    await addAssignment(foreignId, { title: "Yabancı" });
+    await db.update(courses).set({ archivedAt: hours(-5) }).where(eq(courses.id, archivedId));
+    await submit(s.id, done.id);
 
-    // unpublished score: lands in "teslim" with result null, even when graded
-    const [subWaiting] = await db.select().from(submissions).where(eq(submissions.assignmentId, waiting.id));
-    await db.update(submissions).set({ score: 55, gradedAt: NOW }).where(eq(submissions.id, subWaiting!.id));
-    const teslim = await service.listCourseAssignments(courseId, s.id, NOW, { filter: "teslim" });
-    expect(teslim!.map((i) => i.title)).toEqual(["Puanlı", "Bekleyen puan"]);
-    expect(teslim!.every((i) => i.result === null && i.submittedAt !== null)).toBe(true);
-    expect(await service.listCourseAssignments(courseId, s.id, NOW, { filter: "puan" })).toHaveLength(0);
-
-    // publish one score
-    const [subScored] = await db.select().from(submissions).where(eq(submissions.assignmentId, scored.id));
-    await db
-      .update(submissions)
-      .set({ score: 80, gradedAt: NOW, gradedById: actor.id, scorePublishedAt: hours(-1) })
-      .where(eq(submissions.id, subScored!.id));
-    const puan = await service.listCourseAssignments(courseId, s.id, NOW, { filter: "puan" });
-    expect(puan!.map((i) => i.title)).toEqual(["Puanlı"]);
-    expect(puan![0]!.result).toEqual({ score: 80, maxScore: 100 });
-    const teslim2 = await service.listCourseAssignments(courseId, s.id, NOW, { filter: "teslim" });
-    expect(teslim2!.map((i) => i.title)).toEqual(["Bekleyen puan"]);
+    const mine = await service.listMyAssignmentCards(s.id, NOW);
+    expect(mine.map((c) => c.title)).toEqual(["Bekleyen", "Bitti"]);
+    expect(mine.map((c) => c.group)).toEqual(["bekleyen", "teslim"]);
+    expect(mine[0]!.course).toMatchObject({ id: activeId, archived: false, name: "Veri Yapıları" });
+    expect((await service.listMyAssignmentCards(outsider.id, NOW)).map((c) => c.title)).toEqual(["Yabancı"]);
   });
 
   it("geç teslim edilen ödev isLate taşır", async () => {
@@ -361,8 +414,8 @@ describe.skipIf(!available)("student service (DB)", async () => {
     const courseId = await newCourse([s]);
     const a = await addAssignment(courseId, { dueAt: hours(-5), lateAllowed: true });
     await submit(s.id, a.id, hours(-1));
-    const teslim = await service.listCourseAssignments(courseId, s.id, NOW, { filter: "teslim" });
-    expect(teslim).toHaveLength(1);
-    expect(teslim![0]).toMatchObject({ isLate: true });
+    const odev = await feed(courseId, s.id, "odev");
+    expect(odev!.items).toHaveLength(1);
+    expect(odev!.items[0]).toMatchObject({ assignment: { group: "teslim", submission: { isLate: true } } });
   });
 });
