@@ -50,3 +50,6 @@ next-env.d.ts
 /tests/e2e/.auth/
 /playwright-report/
 /test-results/
+
+# internal docs (Turkish planning notes, kept local only)
+/docs/

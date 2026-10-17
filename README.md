@@ -1,6 +1,6 @@
 # Kodbox Campus
 
-Ders, materyal ve ödev platformu (Next.js 16 + PostgreSQL + Drizzle). Ürün kararları: `docs/PRD.md`, geliştirme kuralları: `docs/SOZLESME.md`, güncel durum: `docs/DURUM.md`.
+Ders, materyal ve ödev platformu (Next.js 16 + PostgreSQL + Drizzle).
 
 ## Kurulum
 
@@ -29,3 +29,7 @@ Geliştirmede mailler gönderilmez, `.dev-mail/` klasörüne HTML olarak yazıl�
 | `npm run db:down` | Postgres'i durdurur (veri korunur) |
 
 İlk admin girişinde şifre değiştirmek zorunludur.
+
+## Lisans
+
+MIT. Ayrıntılar: [LICENSE](LICENSE).
