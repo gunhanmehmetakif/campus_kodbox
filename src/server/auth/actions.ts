@@ -57,8 +57,12 @@ function lockedError(retryAfter: number) {
   return fail(`Çok fazla hatalı deneme. ${formatRetryAfter(retryAfter)} sonra tekrar deneyin.`);
 }
 
-function tokenError(reason: "invalid" | "expired" | "used") {
+const COMMON_PASSWORD_MESSAGE = "Bu şifre çok yaygın, başka bir şifre seçin.";
+
+function tokenError(reason: "invalid" | "expired" | "used" | "common_password") {
   switch (reason) {
+    case "common_password":
+      return fail(COMMON_PASSWORD_MESSAGE, { password: [COMMON_PASSWORD_MESSAGE] });
     case "expired":
       return fail("Bu bağlantının süresi dolmuş. Yeni bir bağlantı isteyin.");
     case "used":
@@ -227,6 +231,8 @@ export async function changePasswordAction(_prev: Prev<void>, formData: FormData
           return fail("Mevcut şifre hatalı.", { currentPassword: ["Mevcut şifre hatalı."] });
         case "same_password":
           return fail("Yeni şifre eskisiyle aynı olamaz.", { password: ["Yeni şifre eskisiyle aynı olamaz."] });
+        case "common_password":
+          return fail(COMMON_PASSWORD_MESSAGE, { password: [COMMON_PASSWORD_MESSAGE] });
         case "locked":
           return lockedError(result.retryAfter);
         default:

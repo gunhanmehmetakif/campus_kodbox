@@ -46,7 +46,7 @@ describe.skipIf(!available)("auth service (DB)", async () => {
 
   const createdUserIds: string[] = [];
   const createdTermIds: string[] = [];
-  const PASSWORD = "Sifre1234";
+  const PASSWORD = "Kirmizi-Elma7";
 
   const rnd = () => crypto.randomUUID();
   const ip = () => `test-${rnd()}`;
@@ -166,6 +166,13 @@ describe.skipIf(!available)("auth service (DB)", async () => {
     expect(await service.verifyTokenState(mail.token)).toEqual({ status: "valid", email });
     const [before] = await db.select().from(users).where(eq(users.emailHash, blindIndex(email)));
     expect(before).toBeUndefined();
+
+    // A common password is refused without consuming the token.
+    expect(await service.completeRegistration({ token: mail.token, password: "Password123" })).toEqual({
+      ok: false,
+      reason: "common_password",
+    });
+    expect(await service.verifyTokenState(mail.token)).toEqual({ status: "valid", email });
 
     const done = await service.completeRegistration({ token: mail.token, password: PASSWORD });
     expect(done.ok).toBe(true);
@@ -345,6 +352,12 @@ describe.skipIf(!available)("auth service (DB)", async () => {
     expect(mail.kind).toBe("sifre-sifirla");
     expect(mail.subject).toContain("Şifre sıfırlama");
 
+    expect(await service.resetPassword({ token: mail.token, password: "Sifre12345" })).toEqual({
+      ok: false,
+      reason: "common_password",
+    });
+    expect((await service.resetTokenState(mail.token)).status).toBe("valid");
+
     const newPassword = "YeniSifre99";
     const result = await service.resetPassword({ token: mail.token, password: newPassword });
     expect(result).toEqual({ ok: true, userId: user.id, role: "instructor" });
@@ -385,6 +398,10 @@ describe.skipIf(!available)("auth service (DB)", async () => {
     expect(
       await service.changePassword({ userId: user.id, sessionId: current, currentPassword: PASSWORD, newPassword: PASSWORD }),
     ).toEqual({ ok: false, reason: "same_password" });
+
+    expect(
+      await service.changePassword({ userId: user.id, sessionId: current, currentPassword: PASSWORD, newPassword: "Qwerty12345" }),
+    ).toEqual({ ok: false, reason: "common_password" });
 
     const done = await service.changePassword({
       userId: user.id,

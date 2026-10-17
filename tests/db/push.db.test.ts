@@ -97,7 +97,7 @@ describe.skipIf(!available)("deliverPush (DB, mocked web-push)", async () => {
   });
 
   const addSub = async (suffix: string) => {
-    const endpoint = `https://push.example.com/${suffix}-${crypto.randomUUID()}`;
+    const endpoint = `https://fcm.googleapis.com/fcm/send/${suffix}-${crypto.randomUUID()}`;
     await db.insert(pushSubscriptions).values({ userId, endpoint, p256dh: "k", auth: "a" });
     return endpoint;
   };
@@ -125,6 +125,16 @@ describe.skipIf(!available)("deliverPush (DB, mocked web-push)", async () => {
     expect(await deliverPush([userId], message)).toEqual({ sent: 0, removed: 2 });
     const left = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
     expect(left.map((r) => r.endpoint)).toEqual([flaky]);
+  });
+
+  it("never contacts a disallowed endpoint and deletes the row", async () => {
+    const bad = `https://169.254.169.254/latest/${crypto.randomUUID()}`;
+    await db.insert(pushSubscriptions).values({ userId, endpoint: bad, p256dh: "k", auth: "a" });
+    send.mockClear();
+    expect(await deliverPush([userId], message)).toEqual({ sent: 0, removed: 1 });
+    expect(send).not.toHaveBeenCalled();
+    const left = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.endpoint, bad));
+    expect(left).toHaveLength(0);
   });
 
   it("is a no-op when push is not configured", async () => {

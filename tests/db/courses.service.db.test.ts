@@ -302,6 +302,11 @@ describe.skipIf(!available)("courses service (DB)", async () => {
 
     await service.deletePost(a.actor, { courseId: a.courseId, id: draft.id });
     expect(await service.listPostRows(a.courseId, "material")).toHaveLength(1);
+    const [log] = await db
+      .select()
+      .from(schema.auditLogs)
+      .where(and(eq(schema.auditLogs.action, "post.delete"), eq(schema.auditLogs.targetId, draft.id)));
+    expect(log).toMatchObject({ actorId: a.actor.id, targetType: "post", metadata: { title: "Taslak", type: "material" } });
   });
 
   it("ders listesi sayıları: öğrenci ve kayıtlı sayısı", async () => {

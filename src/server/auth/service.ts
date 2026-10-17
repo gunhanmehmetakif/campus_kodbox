@@ -27,6 +27,7 @@ import {
 } from "@/lib/identity";
 import { routes } from "@/lib/routes";
 import { audit } from "@/lib/server/audit";
+import { isCommonPassword } from "@/lib/server/common-passwords";
 import { blindIndex, decrypt, encrypt, encryptNullable, generateToken, sha256Hex } from "@/lib/server/crypto";
 import { absoluteUrl, sendMail } from "@/lib/server/mail";
 import { hashPassword, verifyPassword, verifyPasswordDummy } from "@/lib/server/password";
@@ -271,7 +272,7 @@ export async function requestRegistration(
 
 export type CompleteRegistrationResult =
   | { ok: true; userId: string }
-  | { ok: false; reason: "invalid" | "expired" | "used" };
+  | { ok: false; reason: "invalid" | "expired" | "used" | "common_password" };
 
 class TokenRace extends Error {}
 
@@ -281,6 +282,7 @@ export async function completeRegistration(input: {
 }): Promise<CompleteRegistrationResult> {
   const state = await verifyTokenState(input.token);
   if (state.status !== "valid") return { ok: false, reason: state.status };
+  if (isCommonPassword(input.password)) return { ok: false, reason: "common_password" };
 
   const passwordHash = await hashPassword(input.password);
   try {
@@ -430,11 +432,12 @@ export async function requestPasswordReset(
 
 export type ResetPasswordResult =
   | { ok: true; userId: string; role: UserRole }
-  | { ok: false; reason: "invalid" | "expired" | "used" };
+  | { ok: false; reason: "invalid" | "expired" | "used" | "common_password" };
 
 export async function resetPassword(input: { token: string; password: string }): Promise<ResetPasswordResult> {
   const state = await resetTokenState(input.token);
   if (state.status !== "valid") return { ok: false, reason: state.status };
+  if (isCommonPassword(input.password)) return { ok: false, reason: "common_password" };
 
   const passwordHash = await hashPassword(input.password);
   const result = await db.transaction(async (tx) => {
@@ -460,7 +463,7 @@ export async function resetPassword(input: { token: string; password: string }):
 
 export type ChangePasswordResult =
   | { ok: true; role: UserRole }
-  | { ok: false; reason: "wrong_current" | "same_password" | "not_found" }
+  | { ok: false; reason: "wrong_current" | "same_password" | "common_password" | "not_found" }
   | { ok: false; reason: "locked"; retryAfter: number };
 
 export async function changePassword(input: {
@@ -481,6 +484,7 @@ export async function changePassword(input: {
     return { ok: false, reason: "wrong_current" };
   }
   if (await verifyPassword(user.passwordHash, input.newPassword)) return { ok: false, reason: "same_password" };
+  if (isCommonPassword(input.newPassword)) return { ok: false, reason: "common_password" };
 
   const passwordHash = await hashPassword(input.newPassword);
   await db.transaction(async (tx) => {

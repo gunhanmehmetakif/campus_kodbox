@@ -404,6 +404,12 @@ describe.skipIf(!available)("assignments service (DB)", async () => {
     await service.deleteAssignment(actor, { id });
     const gone = await db.select().from(submissions).where(eq(submissions.assignmentId, id));
     expect(gone).toHaveLength(0);
+    const [deleted] = await db
+      .select()
+      .from(auditLogs)
+      .where(and(eq(auditLogs.action, "assignment.delete"), eq(auditLogs.targetId, id)));
+    expect(deleted).toMatchObject({ actorId: actor.id, targetType: "assignment" });
+    expect(deleted!.metadata).toHaveProperty("title");
   });
 
   describe("listPendingGradingItems", () => {

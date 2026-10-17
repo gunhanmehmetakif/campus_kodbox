@@ -409,11 +409,14 @@ async function notifyPublished(tx: DbOrTx, course: Course, postId: string, postT
 export async function deletePost(actor: Actor, input: { courseId: string; id: string }): Promise<void> {
   const course = await requireOwnedCourse(input.courseId, actor);
   if (!UUID.test(input.id)) throw new CourseError("İçerik bulunamadı.");
-  const removed = await db
-    .delete(posts)
-    .where(and(eq(posts.id, input.id), eq(posts.courseId, course.id)))
-    .returning({ id: posts.id });
-  if (removed.length === 0) throw new CourseError("İçerik bulunamadı.");
+  await db.transaction(async (tx) => {
+    const [post] = await tx
+      .delete(posts)
+      .where(and(eq(posts.id, input.id), eq(posts.courseId, course.id)))
+      .returning({ id: posts.id, title: posts.title, type: posts.type });
+    if (!post) throw new CourseError("İçerik bulunamadı.");
+    await audit(actor.id, "post.delete", { type: "post", id: post.id }, { title: post.title, type: post.type }, tx);
+  });
 }
 
 /* ───────────────────────────── reads ───────────────────────────── */

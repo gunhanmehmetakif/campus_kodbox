@@ -204,7 +204,10 @@ async function notifyPublished(tx: DbOrTx, course: Course, assignmentId: string,
 
 export async function deleteAssignment(actor: Actor, input: { id: string }): Promise<void> {
   const { assignment } = await requireOwnedAssignment(input.id, actor);
-  await db.delete(assignments).where(eq(assignments.id, assignment.id));
+  await db.transaction(async (tx) => {
+    await tx.delete(assignments).where(eq(assignments.id, assignment.id));
+    await audit(actor.id, "assignment.delete", { type: "assignment", id: assignment.id }, { title: assignment.title }, tx);
+  });
 }
 
 export async function gradeSubmission(

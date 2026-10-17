@@ -38,6 +38,8 @@ export type AuditAction =
   | "roster.add"
   | "roster.remove"
   | "assignment.dates_change"
+  | "assignment.delete"
+  | "post.delete"
   | "submission.score_publish"
   | "seed.run";
 

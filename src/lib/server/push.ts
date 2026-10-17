@@ -6,6 +6,7 @@ import webpush from "web-push";
 import { db } from "@/db";
 import { pushSubscriptions } from "@/db/schema";
 import { env, isPushConfigured } from "@/lib/env";
+import { isAllowedPushEndpoint } from "@/lib/push-endpoint";
 
 /** Web push delivery (docs/fazlar/F5-F6-ogrenci-bildirim.md 3.2). */
 
@@ -55,6 +56,11 @@ export async function deliverPush(
     const worker = async () => {
       while (next < subs.length) {
         const sub = subs[next++]!;
+        if (!isAllowedPushEndpoint(sub.endpoint)) {
+          await db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, sub.id));
+          result.removed += 1;
+          continue;
+        }
         try {
           await webpush.sendNotification(
             { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },

@@ -14,6 +14,7 @@ import { emailDomain, normalizeDomain } from "@/lib/identity";
 import { passwordSchema } from "@/lib/password-policy";
 import { audit } from "@/lib/server/audit";
 import { blindIndex, encrypt } from "@/lib/server/crypto";
+import { isCommonPassword } from "@/lib/server/common-passwords";
 import { hashPassword } from "@/lib/server/password";
 
 export const MKU = {
@@ -72,6 +73,7 @@ async function ensureAdmin(school: School): Promise<{ created: boolean; email: s
   if (!parsed.success) {
     throw new Error(`SEED_ADMIN_PASSWORD is invalid: ${parsed.error.issues.map((i) => i.message).join(" ")}`);
   }
+  if (isCommonPassword(password)) throw new Error("SEED_ADMIN_PASSWORD is too common; choose another one.");
 
   const now = new Date();
   const [admin] = await db

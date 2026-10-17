@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { isAllowedPushEndpoint } from "@/lib/push-endpoint";
+
 /**
  * Notification schemas (docs/fazlar/F5-F6-ogrenci-bildirim.md 3.3). Pure module.
  * `openNotificationAction` takes FormData (field `id`); the push actions take typed input
@@ -19,13 +21,7 @@ export const savePushSubscriptionSchema = z.object({
     .string({ error: "Geçersiz bildirim aboneliği." })
     .trim()
     .max(PUSH_ENDPOINT_MAX, "Geçersiz bildirim aboneliği.")
-    .refine((v) => {
-      try {
-        return new URL(v).protocol === "https:";
-      } catch {
-        return false;
-      }
-    }, "Geçersiz bildirim aboneliği."),
+    .refine(isAllowedPushEndpoint, "Geçersiz bildirim aboneliği."),
   keys: z.object({
     p256dh: z.string({ error: "Geçersiz bildirim aboneliği." }).min(1).max(PUSH_KEY_MAX),
     auth: z.string({ error: "Geçersiz bildirim aboneliği." }).min(1).max(PUSH_KEY_MAX),

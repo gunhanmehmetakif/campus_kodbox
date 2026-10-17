@@ -4,7 +4,7 @@ import { buildSubmissionsCsv } from "@/server/assignments/service";
 export async function GET(_request: Request, ctx: { params: Promise<{ assignmentId: string }> }) {
   const { assignmentId } = await ctx.params;
   const user = await getAuthUser();
-  if (!user || user.role !== "instructor") return new Response("Not found", { status: 404 });
+  if (!user || user.role !== "instructor" || user.mustChangePassword) return new Response("Not found", { status: 404 });
 
   const csv = await buildSubmissionsCsv(assignmentId, user.id);
   if (!csv) return new Response("Not found", { status: 404 });

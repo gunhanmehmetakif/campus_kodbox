@@ -297,6 +297,8 @@ const AUDIT_LABELS: Record<AuditAction, string> = {
   "roster.add": "Öğrenci listesine ekleme yapıldı",
   "roster.remove": "Öğrenci listeden çıkarıldı",
   "assignment.dates_change": "Ödev tarihleri değiştirildi",
+  "assignment.delete": "Ödev silindi",
+  "post.delete": "Paylaşım silindi",
   "submission.score_publish": "Puanlar yayınlandı",
   "seed.run": "Başlangıç verisi yüklendi",
 };
