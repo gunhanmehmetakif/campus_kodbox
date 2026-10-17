@@ -16,17 +16,17 @@
 
 </div>
 
-**English:** Kodbox Campus is a course, material and assignment platform for universities. Instructors create courses, add students by pasting school numbers, and post announcements, materials and assignments. Students submit work by pasting a Google Drive link, mostly from a phone, in at most three taps; the platform stores no files. Built with Next.js 16, TypeScript, PostgreSQL and Drizzle. Personal data (emails, student numbers, roster names) is encrypted with AES-256-GCM and looked up through HMAC blind indexes. The first deployment targets Mustafa Kemal University, but schools, mail domains and student-number formats are configurable per school. The UI is Turkish only. MIT licensed.
+**English:** Born from a real classroom problem: an instructor collected homework as Drive links sent by email. Kodbox Campus is a course, material and assignment platform for universities. Instructors create courses, add students by pasting school numbers, and post announcements, materials and assignments. Students submit work by pasting a Google Drive link, mostly from a phone, in at most three taps; the platform stores no files. Built with Next.js 16, TypeScript, PostgreSQL and Drizzle. Personal data (emails, student numbers, roster names) is encrypted with AES-256-GCM and looked up through HMAC blind indexes. The first deployment targets Mustafa Kemal University, but schools, mail domains and student-number formats are configurable per school. The UI is Turkish only. MIT licensed.
 
 ## Neden?
 
-Üniversite derslerinde ödev teslimi çoğu zaman mesaj gruplarına, e-posta eklerine ve dağınık tablolara dayanır. Eğitmen kimin teslim ettiğini, kimin geç kaldığını elle takip eder; öğrenci ödevin ne zaman bittiğini bir yerden bulmaya çalışır.
+Bu proje okulda yaşadığım bir durumdan çıktı. Bir öğretim görevlimiz ders notlarını Google Drive'a yüklüyor, ödevleri de "dosyayı Drive'a yükle, linkini mailime gönder" diye istiyordu. Öğrenci olarak her dersin notu, duyurusu ve son teslim tarihi farklı bir yerde kalıyordu. Hoca da hangi linkin kime ait olduğunu, kimin teslim edip kimin etmediğini e-posta kutusundan tek tek takip edip not vermek zorundaydı.
 
-Kodbox Campus bu akışı iki tarafın da gerçek kullanımına göre kurar:
+Kodbox Campus aynı alışkanlığı (Drive'a yükle, linkini gönder) bozmadan bu dağınıklığı toplar:
 
-- **Eğitmen** ders açar, öğrenci numaralarını alt alta yapıştırarak listeyi oluşturur, duyuru, materyal ve ödev paylaşır. Teslimleri tek tabloda görür ve klavyeyle puanlar.
-- **Öğrenci** çoğunlukla telefondan girer. Yaklaşan teslimleri panelde görür, Google Drive linkini yapıştırır ve girişten teslime en fazla üç dokunuşla ulaşır.
-- **Platform dosya saklamaz.** Teslimler Drive linkidir; depolama maliyeti ve dosya güvenliği yükü yoktur.
+- **Öğrenci** tüm derslerinin notlarını, duyurularını ve yaklaşan teslimlerini tek panelde görür. Ödevini telefondan Drive linkini yapıştırarak en fazla üç dokunuşla teslim eder.
+- **Eğitmen** teslimleri e-posta yerine tek bir tabloda görür: kim teslim etti, kim etmedi, kim geç kaldı. Puanı tabloya yazıp Enter'la sonraki öğrenciye geçer, puanları tek tuşla yayınlar.
+- **Platform dosya saklamaz.** Dosyalar yine öğrencinin Drive'ında kalır; depolama maliyeti ve dosya güvenliği yükü yoktur.
 - **Çok okul desteği** yapıdadır. Her okul için öğrenci ve personel mail alan adı ile öğrenci numarası düzenli ifadesi (regex) tanımlanır. İlk okul Mustafa Kemal Üniversitesi'dir (MKÜ).
 
 ## Ekran görüntüleri
